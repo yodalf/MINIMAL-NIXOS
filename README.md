@@ -84,6 +84,18 @@ back.
 To sync from this repo instead, `git clone` it to `/etc/nixos` (git is
 installed) and run `rebuild`.
 
+Evaluating the config takes ~600 MB of RAM, so on a 1 GB instance prefer
+pushing from the dev VM, which builds the closure and copies it over SSH
+without evaluating anything on the server:
+
+```sh
+SERVER=root@<ip> VM_PASS=... ./build.sh deploy        # switch now
+SERVER=root@<ip> VM_PASS=... ./build.sh deploy boot   # activate on next reboot
+```
+
+The dev VM's own SSH key is in `sshKeys` for this purpose; `/etc/nixos` on
+the server is refreshed with the deployed sources.
+
 ## What was cut, and why
 
 | Cut | Saves | How |

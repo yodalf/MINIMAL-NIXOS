@@ -43,6 +43,7 @@
       packages.${system} = {
         iso = installer.config.system.build.isoImage;
         server = server.config.system.build.toplevel;
+        src = src;
         default = installer.config.system.build.isoImage;
       };
     };

@@ -8,7 +8,10 @@
 
 let
   sshKeys = [
+    # Mac
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPSVW47bBFslTU+LrvsULGZ/t9RDI5aipdFOD9E8VelA Mac Github"
+    # NixOS dev VM (realix), used by `build.sh deploy`
+    "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDL0KSdYf8ksk61rXqXVhg1n8ZEOJYLetnSDxUO+Jhi5CxTvJDX9gDuQ2NDTKEA5drf53uMT7deGCGVCL9L++3hpXabQ1CQrpptIzxad9ZskIYgbwG0cahfeYlUp7q9SzyPG4rNYdW3tb5ijP3fvg0PkhkrmEGjoYlu/x7/6tCWdRioWLGxvnVT6CIyU6iVjMJzc3bX0nVkv6Hat541U2GEGq1uRhM4Um5D75ki1yWpqbAr5cqH+A/JtTrPUC7iVThBZvu+QLrKH6fxFHQVVSS3sdEz3K73MaLUph7m290cNxYhYBP1/wcaH4aQvKzLCuJbM2gIG/jy4RUTAd01UyTKb/raBcMyQ7GkS6iVpwELpQSHN2e+dBngXoIB6GLDl2vo7aVf+6AqI7WcCKpbnff547aTotdM0DsK8OVrQ3xZdxOnghgZXKPRn6ge9BksKFeBM1mcYyEDZ+4zUN8oWxUMV6CINFnMSFrPs0wk7W4Xxkv7/SQcQz7q/jhd1bHgFyU= realo"
   ];
 
   vultr-install = pkgs.writeShellApplication {
