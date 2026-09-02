@@ -3,29 +3,27 @@
 # Everything that is specific to this machine's role lives here; server.nix
 # stays a generic minimal Vultr box.
 #
-# Status: software and service are in place, but there is no domain name and
-# no TLS certificate yet. Until then headscale listens on 127.0.0.1:8080 only
-# (the module default) and the two placeholders below must be filled in
-# before any client can connect. See "Finishing the setup" at the bottom.
+# Public name: hs.realo.ca (A record at Dyn -> 104.238.132.193). TLS comes
+# from Let's Encrypt via headscale's built-in ACME client (HTTP-01 on port
+# 80); the certificate is cached in /var/lib/headscale/.cache and renewed
+# automatically. See "Using it" at the bottom.
 { config, lib, pkgs, ... }:
 
 let
-  # PLACEHOLDERS: replace when the DNS name exists.
   # Public name clients connect to (https://<fqdn>).
-  fqdn = "headscale.example.com";
-  # MagicDNS suffix for nodes (<node>.<baseDomain>). Must not be the same as,
-  # or a parent of, the server's own domain.
-  baseDomain = "ts.example.com";
+  fqdn = "hs.realo.ca";
+  # MagicDNS suffix for nodes (<node>.<baseDomain>), tailnet-internal only.
+  # Must not be the same as, or a parent of, the server's own domain.
+  baseDomain = "ts.realo.ca";
 in
 {
   networking.hostName = "headscale";
 
   services.headscale = {
     enable = true;
-    # Loopback only until TLS is set up (see below). Then switch to
-    #   address = "0.0.0.0"; port = 443;
-    address = "127.0.0.1";
-    port = 8080;
+    # Public HTTPS listener (the module grants CAP_NET_BIND_SERVICE for <1024).
+    address = "0.0.0.0";
+    port = 443;
 
     settings = {
       server_url = "https://${fqdn}";
@@ -44,33 +42,28 @@ in
       database.type = "sqlite";
       log.level = "info";
 
-      ### TLS: pick one of the two when the certificate question is settled.
-      # (a) Let headscale get its own Let's Encrypt certificate. Needs the
-      #     public listener on 443 and port 80 reachable for HTTP-01:
-      # tls_letsencrypt_hostname = fqdn;
-      # tls_letsencrypt_challenge_type = "HTTP-01";
-      # tls_letsencrypt_listen = ":http";
-      #
-      # (b) Bring your own certificate (readable by the headscale user):
+      # Let's Encrypt via HTTP-01: headscale answers the challenge on port 80
+      # itself. Let's Encrypt allows 5 failed validations per hostname per
+      # hour, so the A record must exist before this starts.
+      tls_letsencrypt_hostname = fqdn;
+      tls_letsencrypt_challenge_type = "HTTP-01";
+      tls_letsencrypt_listen = ":http";
+      # Alternative, a certificate from elsewhere (readable by headscale):
       # tls_cert_path = "/var/lib/headscale/tls/fullchain.pem";
       # tls_key_path = "/var/lib/headscale/tls/privkey.pem";
     };
   };
 
-  # 80 for the ACME HTTP-01 challenge, 443 for clients. Nothing listens on
-  # them yet; they are open so that only the TLS block above changes later.
+  # 80 for the ACME HTTP-01 challenge, 443 for clients.
   networking.firewall.allowedTCPPorts = [ 80 443 ];
 
   # Let realo run `headscale users create …` etc. without sudo: the CLI talks
   # to the unix socket in /run/headscale, which is group-readable.
   users.users.realo.extraGroups = [ "headscale" ];
 
-  ### Finishing the setup ####################################################
+  ### Using it ###############################################################
   #
-  # 1. Point <fqdn> at 104.238.132.193, set `fqdn` and `baseDomain` above.
-  # 2. Enable one TLS block, set address = "0.0.0.0" and port = 443.
-  # 3. Deploy: SERVER=root@104.238.132.193 ./build.sh deploy
-  # 4. On the box:  headscale users create <name>
-  #                 headscale preauthkeys create --user <id> --reusable
-  #    Client:      tailscale up --login-server https://<fqdn> --authkey <key>
+  # On the box:  headscale users create <name>
+  #              headscale preauthkeys create --user <id> --reusable
+  # Client:      tailscale up --login-server https://hs.realo.ca --authkey <key>
 }
