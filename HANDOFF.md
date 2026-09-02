@@ -153,7 +153,17 @@ Gotchas found:
 - The server has no rsync; use `tar | ssh` if you ever need to copy a tree
   there by hand. `build.sh deploy` refreshes `/etc/nixos` on its own.
 
+`headscale` is a permanent, independent branch: it is never merged into
+`main`, which stays the generic server. Rebase or cherry-pick generic fixes
+from `main` onto it as needed.
+
+What `/var/lib/headscale` holds (372 KB, owner `headscale`): `db.sqlite`
+(+ `-wal`/`-shm`; users, nodes, keys, IPs), `noise_private.key` (the server
+identity every client pinned; losing it or the db means re-registering all
+nodes) and `.cache/` (Let's Encrypt account key and the current cert;
+harmless to lose, headscale re-requests). Back up the db with
+`sqlite3 db.sqlite ".backup <file>"` or with headscale stopped, never by
+copying the raw file while it runs.
+
 Not done: backups of `/var/lib/headscale`; an ACL policy (all nodes of
-`realo` can reach each other, which is the default); merging `headscale`
-into `main` (main stays the generic server; decide whether the role should
-live there or stay a branch).
+`realo` can reach each other, which is the default).
