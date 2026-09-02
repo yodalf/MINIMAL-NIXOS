@@ -8,10 +8,11 @@
       system = "x86_64-linux";
       lib = nixpkgs.lib;
 
-      # The system that gets installed on the Vultr disk.
+      # The system that gets installed on the Vultr disk: the generic minimal
+      # box plus this machine's role.
       server = lib.nixosSystem {
         inherit system;
-        modules = [ ./modules/server.nix ];
+        modules = [ ./modules/server.nix ./modules/headscale.nix ];
       };
 
       # Only these files are copied to /etc/nixos on the installed server (and

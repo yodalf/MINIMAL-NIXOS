@@ -104,7 +104,7 @@ in
 
   ### Networking #############################################################
 
-  networking.hostName = "server";
+  networking.hostName = lib.mkDefault "server";
   networking.useNetworkd = true;
   networking.useDHCP = true;
   networking.firewall.enable = true;

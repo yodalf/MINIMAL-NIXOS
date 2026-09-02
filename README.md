@@ -12,7 +12,8 @@ Closure of the installed system: **~900 MiB**. Installer ISO: **~500 MB**
 | File | Purpose |
 |------|---------|
 | `flake.nix` | Pins nixpkgs `nixos-26.05`; exposes `server` and `installer` configs and the `iso` package |
-| `modules/server.nix` | The system that gets installed. Add services here or in a new module |
+| `modules/server.nix` | The generic minimal system that gets installed |
+| `modules/headscale.nix` | This machine's role: the [headscale](https://github.com/juanfont/headscale) coordination server, hostname `headscale` |
 | `modules/installer.nix` | Live ISO carrying the prebuilt `server` closure and a `vultr-install` script |
 | `build.sh` | Syncs the repo to the NixOS dev VM and builds there (the ISO is x86_64; the VM builds it via binfmt emulation) |
 
@@ -67,6 +68,21 @@ Then `ssh realo@<ip>` or `ssh root@<ip>` with a key from `sshKeys` in
 installed system; boot the ISO again if you need a rescue shell. To allow
 console login, set `users.users.realo.hashedPassword` to the output of
 `openssl passwd -6`.
+
+## Headscale
+
+`modules/headscale.nix` enables `services.headscale` (headscale 0.28 from
+nixpkgs) with SQLite, MagicDNS and the public Tailscale DERP relays. Until a
+DNS name and a certificate exist it only listens on `127.0.0.1:8080`; the
+`fqdn` and `baseDomain` placeholders at the top of the module and one of the
+two commented TLS blocks must be filled in, then `address`/`port` switched to
+`0.0.0.0:443`. Ports 80 and 443 are already open in the firewall. The `realo`
+user is in the `headscale` group, so the CLI works without sudo:
+
+```sh
+headscale users create <name>
+headscale preauthkeys create --user <id> --reusable
+```
 
 ## Updating the server
 
