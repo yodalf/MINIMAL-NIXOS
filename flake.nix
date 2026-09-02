@@ -43,7 +43,8 @@
       packages.${system} = {
         iso = installer.config.system.build.isoImage;
         server = server.config.system.build.toplevel;
-        src = src;
+        # Same files as `src`, as a derivation so `nix build`/`nix copy` accept it.
+        src = nixpkgs.legacyPackages.${system}.runCommandLocal "minimal-nixos-src" { } "cp -r ${src} $out";
         default = installer.config.system.build.isoImage;
       };
     };
