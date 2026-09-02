@@ -4,8 +4,8 @@ A deliberately small, text-only NixOS configuration for a generic server VM
 on [Vultr](https://www.vultr.com), plus a custom installer ISO that puts it on
 the instance's disk with no network access needed during the install.
 
-Closure of the installed system: **~900 MiB** (a stock `nixos-generate-config`
-server on the same nixpkgs is roughly 2x that).
+Closure of the installed system: **~900 MiB**. Installer ISO: **~500 MB**
+(the ISO also holds the installer's own live system and is zstd-compressed).
 
 ## Layout
 
@@ -24,7 +24,13 @@ The repo is built on the dev VM in `/home/realo/Data/Work/MINIMAL-SERVER`:
 VM_PASS=... ./build.sh eval     # evaluate only, catches option errors fast
 VM_PASS=... ./build.sh server   # build the server closure and print its size
 VM_PASS=... ./build.sh iso      # build the ISO and copy it to ./out/
+VM_PASS=... ./build.sh test     # boot the ISO in QEMU on the VM, install, reboot, log in
 ```
+
+`test` runs `test/qemu-boot-test.sh`: an expect script that boots the ISO on
+an 8 GB virtio disk under QEMU (TCG, so it is slow but works on the aarch64
+VM), runs `vultr-install`, reboots from the disk and logs in as `realo` over
+the serial console. It prints `PASS` or a `FAIL:` reason.
 
 Without `VM_PASS`, plain key-based ssh is used. `VM_HOST` and `VM_DIR`
 override the defaults.

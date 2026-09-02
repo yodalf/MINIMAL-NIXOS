@@ -6,6 +6,7 @@
 #   ./build.sh            build the ISO, copy it to ./out/
 #   ./build.sh server     only build the server closure and print its size
 #   ./build.sh eval       just evaluate (fast syntax/option check)
+#   ./build.sh test       boot the built ISO in QEMU on the VM, install, reboot, log in
 #
 # Set VM_PASS to use sshpass; otherwise plain key-based ssh is used.
 set -euo pipefail
@@ -37,7 +38,10 @@ case "${1:-iso}" in
     "${RSYNC[@]}" -aL "$VM_HOST:$VM_DIR/result/iso/" out/
     ls -lh out/
     ;;
+  test)
+    "${SSH[@]}" "$VM_HOST" "cd $VM_DIR && nix shell nixpkgs#qemu nixpkgs#expect --command test/qemu-boot-test.sh result/iso/*.iso"
+    ;;
   *)
-    echo "usage: $0 [iso|server|eval]" >&2; exit 2
+    echo "usage: $0 [iso|server|eval|test]" >&2; exit 2
     ;;
 esac
