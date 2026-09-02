@@ -27,6 +27,15 @@ VM_PASS=... ./build.sh iso      # build the ISO and copy it to ./out/
 VM_PASS=... ./build.sh test     # boot the ISO in QEMU on the VM, install, reboot, log in
 ```
 
+To do the same by hand on the VM (serial console, you type the commands):
+
+```sh
+test/qemu-manual.sh install     # boots the ISO; run vultr-install, then poweroff
+test/qemu-manual.sh boot        # boots the installed disk; login realo, or ssh -p 2222
+UEFI=1 test/qemu-manual.sh ...  # same, but firmware is OVMF instead of SeaBIOS
+test/qemu-manual.sh reset       # throw the disk image away
+```
+
 `test` runs `test/qemu-boot-test.sh`: an expect script that boots the ISO on
 an 8 GB virtio disk under QEMU (TCG, so it is slow but works on the aarch64
 VM), runs `vultr-install`, reboots from the disk and logs in as `realo` over
