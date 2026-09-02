@@ -69,7 +69,7 @@ in
   system.stateVersion = "26.05";
 
   isoImage = {
-    edition = "vultr-installer";
+    edition = "vultr";
     makeBiosBootable = true;
     makeEfiBootable = true;
     makeUsbBootable = true;

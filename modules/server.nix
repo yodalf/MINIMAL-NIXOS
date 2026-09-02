@@ -5,6 +5,27 @@
 { config, lib, pkgs, modulesPath, ... }:
 
 let
+  # Minimal stand-in for `nixos-rebuild switch|boot --flake /etc/nixos#server`.
+  rebuild = pkgs.writeShellApplication {
+    name = "rebuild";
+    runtimeInputs = [ config.nix.package ];
+    text = ''
+      action="''${1:-switch}"
+      flake="''${2:-/etc/nixos#server}"
+      case "$action" in
+        switch|boot|test|dry-activate) ;;
+        *) echo "usage: rebuild [switch|boot|test|dry-activate] [flake#name]" >&2; exit 2 ;;
+      esac
+      [ "$(id -u)" = 0 ] || exec sudo "$0" "$@"
+      out=$(nix build --no-link --print-out-paths \
+              "''${flake%%#*}#nixosConfigurations.''${flake##*#}.config.system.build.toplevel")
+      if [ "$action" != test ] && [ "$action" != dry-activate ]; then
+        nix-env -p /nix/var/nix/profiles/system --set "$out"
+      fi
+      exec "$out/bin/switch-to-configuration" "$action"
+    '';
+  };
+
   sshKeys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPSVW47bBFslTU+LrvsULGZ/t9RDI5aipdFOD9E8VelA Mac Github"
   ];
@@ -90,8 +111,9 @@ in
     };
   };
 
-  # Lets the Vultr panel do clean shutdowns/reboots and query the guest.
-  services.qemuGuest.enable = true;
+  # No QEMU guest agent: Vultr's panel stop/restart are ACPI events that
+  # systemd already handles. Enabling it would add qemu-ga + glib (~20 MB).
+  services.qemuGuest.enable = false;
 
   ### Users ##################################################################
 
@@ -122,6 +144,18 @@ in
   boot.enableContainers = false;
   programs.nano.enable = false;
 
+  # systemd-importd drags in gnupg + openldap; nothing here imports images.
+  systemd.services.systemd-importd.enable = false;
+
+  # Installer tools: nixos-rebuild is a Python program in 26.05 (+127 MB),
+  # nixos-option pulls man-db/groff, the others are only useful on the ISO.
+  # `rebuild` below does what `nixos-rebuild switch --flake` does in ~5 lines.
+  system.tools.nixos-rebuild.enable = false;
+  system.tools.nixos-option.enable = false;
+  system.tools.nixos-generate-config.enable = false;
+  system.tools.nixos-install.enable = false;
+  system.tools.nixos-enter.enable = false;
+
   i18n.defaultLocale = "en_US.UTF-8";
   i18n.supportedLocales = [ "en_US.UTF-8/UTF-8" ];
   time.timeZone = "UTC";
@@ -146,5 +180,6 @@ in
   environment.systemPackages = with pkgs; [
     gitMinimal # to pull this repo on the server
     vim
+    rebuild
   ];
 }

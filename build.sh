@@ -21,16 +21,18 @@ fi
 
 cd "$(dirname "$0")"
 "${RSYNC[@]}" -a --delete --exclude .git --exclude out --exclude result ./ "$VM_HOST:$VM_DIR/"
+# Keep the lock file that nix writes on the VM in the repo.
+"${RSYNC[@]}" -a --ignore-missing-args "$VM_HOST:$VM_DIR/flake.lock" ./ 2>/dev/null || true
 
 case "${1:-iso}" in
   eval)
     "${SSH[@]}" "$VM_HOST" "cd $VM_DIR && nix eval .#nixosConfigurations.server.config.system.build.toplevel.drvPath && nix eval .#nixosConfigurations.installer.config.system.build.isoImage.drvPath"
     ;;
   server)
-    "${SSH[@]}" "$VM_HOST" "cd $VM_DIR && nix build .#server -L --no-link --print-out-paths | xargs nix path-info -Sh"
+    "${SSH[@]}" "$VM_HOST" "cd $VM_DIR && nix build .#packages.x86_64-linux.server -L --no-link --print-out-paths | xargs nix path-info -Sh"
     ;;
   iso)
-    "${SSH[@]}" "$VM_HOST" "cd $VM_DIR && nix build .#iso -L --out-link result && ls -lh result/iso/"
+    "${SSH[@]}" "$VM_HOST" "cd $VM_DIR && nix build .#packages.x86_64-linux.iso -L --out-link result && ls -lh result/iso/"
     mkdir -p out
     "${RSYNC[@]}" -aL "$VM_HOST:$VM_DIR/result/iso/" out/
     ls -lh out/
