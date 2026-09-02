@@ -4,7 +4,7 @@
 # all-hardware, every filesystem, firmware blobs, the manual and a copy of
 # nixpkgs. This ISO has just enough to partition /dev/vda and copy the
 # prebuilt server closure onto it, with no network required.
-{ config, lib, pkgs, modulesPath, self, serverSystem, ... }:
+{ config, lib, pkgs, modulesPath, src, serverSystem, ... }:
 
 let
   sshKeys = [
@@ -51,7 +51,7 @@ let
 
       # Ship the flake so the server can `nixos-rebuild switch --flake /etc/nixos#server`.
       mkdir -p /mnt/etc/nixos
-      cp -rT ${self} /mnt/etc/nixos
+      cp -rT ${src} /mnt/etc/nixos
       chmod -R u+w /mnt/etc/nixos
 
       sync
@@ -75,7 +75,7 @@ in
     makeEfiBootable = true;
     makeUsbBootable = true;
     # Carry the server closure and this repo in the ISO's nix store.
-    storeContents = [ serverSystem self ];
+    storeContents = [ serverSystem src ];
     squashfsCompression = "zstd -Xcompression-level 19";
   };
 

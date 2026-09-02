@@ -14,11 +14,26 @@
         modules = [ ./modules/server.nix ];
       };
 
+      # Only these files are copied to /etc/nixos on the installed server (and
+      # so into the ISO). Anything else in this directory, such as build logs
+      # or disk images, stays out.
+      src = lib.fileset.toSource {
+        root = ./.;
+        fileset = lib.fileset.unions [
+          ./flake.nix
+          ./flake.lock
+          ./modules
+          ./build.sh
+          ./README.md
+          ./test
+        ];
+      };
+
       # A stripped-down live ISO that carries the prebuilt `server` closure
       # and a `vultr-install` script. Upload it to Vultr as a custom ISO.
       installer = lib.nixosSystem {
         inherit system;
-        specialArgs = { inherit self; serverSystem = server.config.system.build.toplevel; };
+        specialArgs = { inherit src; serverSystem = server.config.system.build.toplevel; };
         modules = [ ./modules/installer.nix ];
       };
     in

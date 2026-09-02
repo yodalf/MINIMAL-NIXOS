@@ -2,3 +2,4 @@ result
 result-*
 out/
 *.qcow2
+*.log

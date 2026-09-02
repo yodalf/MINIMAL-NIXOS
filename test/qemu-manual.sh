@@ -9,7 +9,7 @@
 #   test/qemu-manual.sh reset           delete the disk image
 #
 # Environment:
-#   DISK=disk.qcow2   disk image (created if missing, 8G)
+#   DISK=~/.cache/minimal-nixos/disk.qcow2   disk image (created if missing, 8G)
 #   UEFI=1            boot with OVMF instead of SeaBIOS (tests the EFI GRUB path)
 #   MEM=2048 SMP=2    guest memory (MB) and cpus
 #   SSH_PORT=2222     host port forwarded to guest port 22 (ssh -p 2222 realo@<vm-ip>)
@@ -19,7 +19,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 NIXPKGS="github:NixOS/nixpkgs/a3116115851d68b8952a2a4221cc25a84e56b532"
-DISK="${DISK:-disk.qcow2}"
+DISK="${DISK:-${XDG_CACHE_HOME:-$HOME/.cache}/minimal-nixos/disk.qcow2}"
+mkdir -p "$(dirname "$DISK")"
 MEM="${MEM:-2048}"
 SMP="${SMP:-2}"
 SSH_PORT="${SSH_PORT:-2222}"

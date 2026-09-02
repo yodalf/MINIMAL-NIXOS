@@ -21,7 +21,7 @@ if [[ -n "${VM_PASS:-}" ]]; then
 fi
 
 cd "$(dirname "$0")"
-"${RSYNC[@]}" -a --delete --exclude .git --exclude out --exclude result ./ "$VM_HOST:$VM_DIR/"
+"${RSYNC[@]}" -a --delete --exclude .git --exclude out --exclude result --exclude "*.log" --exclude "*.qcow2" ./ "$VM_HOST:$VM_DIR/"
 # Keep the lock file that nix writes on the VM in the repo.
 "${RSYNC[@]}" -a --ignore-missing-args "$VM_HOST:$VM_DIR/flake.lock" ./ 2>/dev/null || true
 
