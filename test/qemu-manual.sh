@@ -14,7 +14,8 @@
 #   MEM=2048 SMP=2    guest memory (MB) and cpus
 #   SSH_PORT=2222     host port forwarded to guest port 22 (ssh -p 2222 realo@<vm-ip>)
 #
-# Ctrl-a x quits QEMU. Console login: realo / the hashedPassword in server.nix.
+# Ctrl-a x quits QEMU. The installed server has no console password (SSH only,
+# ssh -p 2222); set users.users.realo.hashedPassword to log in on the console.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

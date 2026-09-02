@@ -61,10 +61,12 @@ override the defaults.
    `/dev/sda`).
 4. Detach the ISO in the panel and `reboot`.
 
-Then `ssh realo@<ip>` or `ssh root@<ip>` with the key in `modules/server.nix`.
-The `realo` account also has a console password (for the Vultr VNC console
-only; SSH password auth is off). Change it by replacing `hashedPassword`
-with the output of `openssl passwd -6`.
+Then `ssh realo@<ip>` or `ssh root@<ip>` with a key from `sshKeys` in
+`modules/server.nix`. There are no passwords at all: SSH is key-only and
+`sudo` asks for none. The Vultr VNC console therefore cannot log in to the
+installed system; boot the ISO again if you need a rescue shell. To allow
+console login, set `users.users.realo.hashedPassword` to the output of
+`openssl passwd -6`.
 
 ## Updating the server
 

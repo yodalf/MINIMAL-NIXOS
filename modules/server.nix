@@ -131,9 +131,8 @@ in
     isNormalUser = true;
     extraGroups = [ "wheel" ];
     openssh.authorizedKeys.keys = sshKeys;
-    # Console (VNC) login only; SSH password auth is off. Change with
-    # `openssl passwd -6` and rebuild.
-    hashedPassword = "$6$M7HeexihuQ0AAx58$bED5gFkYVgxfKIJrtK5N0itOLa8Ywbs44fA9qc9xxYw3CIzHqec9itvbRdDqRsL0w28Qn6Biop2KeKwbJe/Kt/";
+    # No password: access is SSH-key only (sudo needs no password). To allow
+    # console (VNC) login, add hashedPassword = "<output of openssl passwd -6>".
   };
   security.sudo.wheelNeedsPassword = false;
 

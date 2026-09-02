@@ -12,7 +12,7 @@ set -euo pipefail
 ISO="${1:?usage: $0 <iso>}"
 WORK="${WORK:-$(mktemp -d)}"
 DISK="$WORK/disk.qcow2"
-PASSWORD="${CONSOLE_PASSWORD:-toto12345}"
+PASSWORD="${CONSOLE_PASSWORD:?set CONSOLE_PASSWORD (the server has none by default; add hashedPassword to test console login)}"
 QEMU="${QEMU:-qemu-system-x86_64}"
 
 qemu-img create -q -f qcow2 "$DISK" 8G
