@@ -35,7 +35,7 @@ case "${1:-iso}" in
   iso)
     "${SSH[@]}" "$VM_HOST" "cd $VM_DIR && nix build .#packages.x86_64-linux.iso -L --out-link result && ls -lh result/iso/"
     mkdir -p out
-    "${RSYNC[@]}" -aL "$VM_HOST:$VM_DIR/result/iso/" out/
+    "${RSYNC[@]}" -aL --chmod=u+w "$VM_HOST:$VM_DIR/result/iso/" out/
     ls -lh out/
     ;;
   test)
