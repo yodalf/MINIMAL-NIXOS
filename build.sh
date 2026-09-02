@@ -7,9 +7,9 @@
 #   ./build.sh server     only build the server closure and print its size
 #   ./build.sh eval       just evaluate (fast syntax/option check)
 #   ./build.sh test       boot the built ISO in QEMU on the VM, install, reboot, log in
-#   ./build.sh deploy [switch|boot]
-#                         build the server closure on the VM, push it to the
-#                         running server with nix copy and activate it there.
+#   ./build.sh deploy [switch|boot|test|dry-activate]
+#                         nixos-rebuild --target-host from the dev VM: build
+#                         there, nix copy to the server, activate remotely.
 #                         Needs SERVER=root@<ip>. Nothing is evaluated or built
 #                         on the server itself, so it works on 1 GB of RAM.
 #
@@ -49,19 +49,19 @@ case "${1:-iso}" in
   deploy)
     SERVER="${SERVER:?set SERVER=root@<server-ip>}"
     action="${2:-switch}"
+    # nixos-rebuild on the dev VM builds the closure (x86_64 via binfmt),
+    # copies it to the server with nix copy and activates it there. The
+    # server itself never evaluates or builds anything.
     "${SSH[@]}" "$VM_HOST" "bash -s" <<EOF
 set -euo pipefail
 cd $VM_DIR
 export NIX_SSHOPTS="-o StrictHostKeyChecking=accept-new"
-out=\$(nix build .#packages.x86_64-linux.server --no-link --print-out-paths)
+nixos-rebuild $action --flake .#server --target-host $SERVER --no-ssh-tty
+# Keep /etc/nixos on the server in sync with what was deployed.
 src=\$(nix build .#packages.x86_64-linux.src --no-link --print-out-paths)
-echo ">>> copying \$out to $SERVER"
-nix copy --to ssh://$SERVER "\$out" "\$src"
-echo ">>> activating ($action)"
-ssh -o StrictHostKeyChecking=accept-new $SERVER "set -e
-  nix-env -p /nix/var/nix/profiles/system --set '\$out'
-  '\$out/bin/switch-to-configuration' '$action'
-  rm -rf /etc/nixos && cp -rT '\$src' /etc/nixos && chmod -R u+w /etc/nixos"
+nix copy --to ssh://$SERVER "\$src"
+ssh -o StrictHostKeyChecking=accept-new $SERVER \
+  "rm -rf /etc/nixos && cp -rT '\$src' /etc/nixos && chmod -R u+w /etc/nixos"
 EOF
     ;;
   *)

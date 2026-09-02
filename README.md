@@ -84,17 +84,25 @@ back.
 To sync from this repo instead, `git clone` it to `/etc/nixos` (git is
 installed) and run `rebuild`.
 
-Evaluating the config takes ~600 MB of RAM, so on a 1 GB instance prefer
-pushing from the dev VM, which builds the closure and copies it over SSH
-without evaluating anything on the server:
+Evaluating the config takes ~600 MB of RAM, so on a 1 GB instance the
+intended workflow is to never rebuild on the server. Deploy from the dev VM
+with `nixos-rebuild --target-host`, which builds the x86_64 closure there
+(binfmt emulation), copies it with `nix copy` and activates it over SSH:
 
 ```sh
 SERVER=root@<ip> VM_PASS=... ./build.sh deploy        # switch now
 SERVER=root@<ip> VM_PASS=... ./build.sh deploy boot   # activate on next reboot
 ```
 
-The dev VM's own SSH key is in `sshKeys` for this purpose; `/etc/nixos` on
-the server is refreshed with the deployed sources.
+Or directly on the dev VM, in the repo directory:
+
+```sh
+nixos-rebuild switch --flake .#server --target-host root@<ip>
+```
+
+The dev VM's own SSH key is in `sshKeys` for this purpose. `build.sh deploy`
+also refreshes `/etc/nixos` on the server with the deployed sources, so the
+in-place `rebuild` remains available as a fallback.
 
 ## What was cut, and why
 
