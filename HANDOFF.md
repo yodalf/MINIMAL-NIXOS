@@ -1,7 +1,7 @@
 # Handoff: minimal NixOS server on Vultr, running headscale
 
 Date: 2026-09-02. State at handoff: one server installed and deployed to; it
-runs headscale at https://hs.realo.ca with two nodes connected (branch
+runs headscale at https://hs.realo.ca with three nodes connected (branch
 `headscale`, see the section at the end).
 
 ## What exists
@@ -12,7 +12,7 @@ runs headscale at https://hs.realo.ca with two nodes connected (branch
 | Installer ISO | GitHub release `v0.1`, also `out/` locally and `result/` on the dev VM | 497 MB, x86_64, hybrid BIOS+UEFI, installs offline |
 | Vultr instance | label `headscale` (was `minimal-server`), id `78bb9d0c-b470-4709-8987-ae2be76d2db2`, **104.238.132.193**, plan `vc2-1c-0.5gb` (1 vCPU, 512 MB, 10 GB), region `ewr` | $3.50/month, legacy BIOS boot, OS hostname `headscale` (Vultr's own hostname field still says `server`, it is fixed at creation) |
 | DNS | `hs.realo.ca` A -> 104.238.132.193 | Dyn Standard DNS (account.dyn.com, Zone Level Services > realo.ca). Vultr IPs are static for the instance's lifetime, no DDNS needed |
-| Dev/build VM | `realo@192.168.2.199` (NixOS aarch64, hostname realix) | Builds everything under x86_64 binfmt emulation. Work dir `/home/realo/Data/Work/MINIMAL-SERVER`. Its own NixOS config is off limits. Key login is refused: `build.sh` needs `VM_PASS` |
+| Dev/build VM | `realo@192.168.2.199` (NixOS aarch64, hostname realix) | Builds everything under x86_64 binfmt emulation. Work dir `/home/realo/Data/Work/MINIMAL-SERVER`. Its own NixOS config lives in the realix-iso repo (`/home/realo/Data/Work/realix-iso`, GitHub yodalf/realix-iso) and is updated with `sudo /etc/nixos/update.sh`. Key login is refused: `build.sh` needs `VM_PASS`. Also a tailnet node, `realix.ts.realo.ca` |
 | Vultr API key | `~/.config/vultr/api_key` on the Mac (mode 600) | Access-controlled to the home IP 70.31.223.159 in the Vultr panel |
 
 Installed closure: ~966 MiB (was 908 before headscale). Idle memory: ~135 MB used of 460 MB.
@@ -110,14 +110,16 @@ enables `services.headscale` (headscale 0.28.0 from nixpkgs 26.05) and sets
 `realo` is in the `headscale` group, so the CLI works without sudo. Deploy
 is unchanged: `SERVER=root@104.238.132.193 VM_PASS=... ./build.sh deploy`.
 
-State on the server: one user `realo` (id 1) and two nodes, both under it:
+State on the server: one user `realo` (id 1) and three nodes, all under it:
 
-| Node | Device | Tailnet IP |
-|------|--------|------------|
-| `kerberos` | iPhone (iOS Tailscale app; reports hostname `localhost`, renamed) | 100.64.0.1 |
-| `chaos` | the Mac | 100.64.0.2 |
+| Node | Device | Tailnet IP | Client config |
+|------|--------|------------|---------------|
+| `kerberos` | iPhone (iOS Tailscale app; reports hostname `localhost`, renamed) | 100.64.0.1 | iOS Settings app, see below |
+| `chaos` | the Mac | 100.64.0.2 | Tailscale for macOS, `tailscale login --login-server` |
+| `realix` | the dev VM | 100.64.0.3 | `services.tailscale` in realix-iso commit da5480a: `openFirewall = true`, `tailscale0` is a trusted firewall interface |
 
-Verified: Mac -> `tailscale ping kerberos.ts.realo.ca` works.
+Verified: Mac -> `tailscale ping kerberos.ts.realo.ca` works; the VM is
+reachable from the phone and the Mac over the tailnet.
 
 Adding a device (a headscale "user" is a namespace for nodes, not a login;
 all your own machines go under `realo`):
