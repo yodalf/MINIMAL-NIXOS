@@ -56,7 +56,7 @@ case "${1:-iso}" in
 set -euo pipefail
 cd $VM_DIR
 export NIX_SSHOPTS="-o StrictHostKeyChecking=accept-new"
-nixos-rebuild $action --flake .#server --target-host $SERVER --no-ssh-tty
+nixos-rebuild $action --flake .#server --target-host $SERVER
 # Keep /etc/nixos on the server in sync with what was deployed.
 src=\$(nix build .#packages.x86_64-linux.src --no-link --print-out-paths)
 nix copy --to ssh://$SERVER "\$src"
