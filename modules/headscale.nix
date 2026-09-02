@@ -42,6 +42,10 @@ in
       database.type = "sqlite";
       log.level = "info";
 
+      # Without this headscale chmods its CLI socket to 0700 and only root
+      # can use the CLI; 0770 lets the headscale group (realo) use it.
+      unix_socket_permission = "0770";
+
       # Let's Encrypt via HTTP-01: headscale answers the challenge on port 80
       # itself. Let's Encrypt allows 5 failed validations per hostname per
       # hour, so the A record must exist before this starts.
