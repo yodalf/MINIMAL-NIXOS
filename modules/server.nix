@@ -77,8 +77,13 @@ in
   boot.loader.efi.canTouchEfiVariables = false;
   boot.loader.timeout = 2;
 
-  # tty0 is what the Vultr web (VNC) console shows; ttyS0 is the serial one.
-  boot.kernelParams = [ "console=ttyS0,115200n8" "console=tty0" ];
+  # Kernel messages go to both consoles. The last console= is the primary one
+  # (/dev/console), where systemd prints its status lines and any emergency
+  # shell appears: the serial port, as cloud images do. tty0 is what the
+  # Vultr web (VNC) console shows.
+  boot.kernelParams = [ "console=tty0" "console=ttyS0,115200n8" ];
+  boot.consoleLogLevel = 7;
+  boot.initrd.verbose = true;
   boot.tmp.cleanOnBoot = true;
 
   fileSystems."/" = {
