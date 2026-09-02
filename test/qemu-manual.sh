@@ -35,7 +35,7 @@ fi
 case "$action" in
   install|boot) ;;
   reset) rm -f "$DISK"; echo "removed $DISK"; exit 0 ;;
-  *) sed -n '2,20p' "$0"; exit 2 ;;
+  *) sed -n '2,17p' "$0"; exit 2 ;;
 esac
 
 [[ -e "$DISK" ]] || qemu-img create -f qcow2 "$DISK" 8G
