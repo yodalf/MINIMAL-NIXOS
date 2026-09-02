@@ -33,13 +33,14 @@ let
         -n2:0:+256M -t2:EF00 -c2:ESP \
         -n3:0:0     -t3:8300 -c3:nixos \
         "$DISK"
-      partprobe "$DISK" || true
+      blockdev --rereadpt "$DISK" || true
       udevadm settle
 
       mkfs.vfat -F32 -n ESP /dev/disk/by-partlabel/ESP
       mkfs.ext4 -F -L nixos /dev/disk/by-partlabel/nixos
       udevadm settle
 
+      mkdir -p /mnt
       mount /dev/disk/by-label/nixos /mnt
       mkdir -p /mnt/boot
       mount /dev/disk/by-label/ESP /mnt/boot
