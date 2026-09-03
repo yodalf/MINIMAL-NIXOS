@@ -99,6 +99,12 @@ successful run. Store maintenance: `nix.gc` daily (`--delete-older-than 2d`),
 `nix.optimise` weekly, `auto-optimise-store` on write, GRUB keeps 5 entries.
 Watch it with `journalctl -u nixos-upgrade` and `systemctl list-timers`.
 
+Backups: a role module can drop timestamped archives into `/var/backups`
+(the headscale module does, daily). `SERVER=root@<ip> ./build.sh backup`
+pulls that whole directory to `~/Backups/<hostname>` on the Mac (or
+`$BACKUP_DIR`) over ssh; the server cannot reach the Mac, so run it by hand
+or from a launchd job.
+
 Deploying from the dev VM is still the way to push config changes. It uses
 `nixos-rebuild --target-host`, which builds the x86_64 closure there
 (binfmt emulation), copies it with `nix copy` and activates it over SSH:
