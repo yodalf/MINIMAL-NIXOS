@@ -11,7 +11,7 @@
       # The system that gets installed on the Vultr disk.
       server = lib.nixosSystem {
         inherit system;
-        modules = [ ./modules/server.nix ];
+        modules = [ ./modules/server.nix ./modules/realo-ca.nix ];
       };
 
       # Only these files are copied to /etc/nixos on the installed server (and
