@@ -121,21 +121,14 @@ decided; the ACME part stays as long as something on :80 serves
 `/.well-known/acme-challenge/` from the acme module's webroot.
 
 TLS: `security.acme` (lego) with `acceptTerms`, account email
-`real@realo.ca`, HTTP-01 through nginx (`enableACME`). **The certificate is
-not issued yet**: on 2026-09-03 `realo.ca` still resolves to 45.77.78.141, the
-old stopped 2017 instance, so `acme-order-renew-realo.ca.service` fails
-("Failed to fetch certificates") and nginx serves a self-signed placeholder.
-The unit has no automatic restart; `acme-renew-realo.ca.timer` retries daily,
-which stays well under Let's Encrypt's 5 failed validations per hour. To get
-the real certificate:
-
-```sh
-# 1. at Dyn: realo.ca A -> 64.176.212.253, then wait until this returns it
-dig +short realo.ca
-# 2. on the server (from the dev VM, see Access below)
-systemctl start acme-order-renew-realo.ca.service && systemctl status acme-order-renew-realo.ca.service
-curl -sI https://realo.ca | head -1
-```
+`real@realo.ca`, HTTP-01 through nginx (`enableACME`). The certificate was
+issued on 2026-09-03 right after the `realo.ca` A record (Dyn) was moved to
+64.176.212.253 (`systemctl start acme-order-renew-realo.ca.service`, 7 s);
+it expires 2026-12-02 and `acme-renew-realo.ca.timer` renews it daily as
+needed. If an order ever fails ("Failed to fetch certificates"), nginx keeps
+serving a self-signed placeholder and the timer retries daily, which stays
+well under Let's Encrypt's 5 failed validations per hour; check
+`journalctl -u acme-order-renew-realo.ca.service`.
 
 Access: ssh as root works from the dev VM (its "LOCK" key). The install was
 done by hand from the console/VM: `echo YES | vultr-install /dev/vda`, then
@@ -162,11 +155,12 @@ with hugo (the old box's docker image, or hugo on the Mac/dev VM), build with
 `/var/www/realo.ca` via the dev VM (`tar | ssh root@64.176.212.253`, the
 server has no rsync).
 
-Old-box gotcha: `totos` runs `ddclient`, which sets the `realo.ca` A record
-at Dyn to 45.77.78.141 (journal 2026-09-03 09:03 "IPv4 address set to
-45.77.78.141"). It must be disabled there (`sudo systemctl disable --now
-ddclient`, root needed) before the record is moved, or it will move it back.
-The new box needs no ddclient: Vultr IPs are static for the instance's life.
+Old box: `totos` ran `ddclient`, which kept setting the `realo.ca` A record
+at Dyn to 45.77.78.141. The instance was stopped on 2026-09-03 (ddclient was
+not disabled inside it: the realo account's sudo password is not known to
+this workflow). If it is ever started again, disable ddclient first or it
+will move the record back. The new box needs no ddclient: Vultr IPs are
+static for the instance's life.
 
 Not done: `www.realo.ca` and `whoami.realo.ca` (the old Traefik rules), the
 choice of a final web server, and a backup of `/home/realo/AGORA` beyond the
