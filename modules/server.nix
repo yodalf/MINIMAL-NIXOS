@@ -6,9 +6,13 @@
 
 let
   # Minimal stand-in for `nixos-rebuild switch|boot --flake /etc/nixos#server`.
+  # Evaluating needs ~750 MB: 230 MB resident plus ~500 MB that lands in the
+  # swap file below. Cold (nixpkgs not in the store) ~2.5 min, warm ~40 s.
+  # coreutils is on the PATH explicitly so the script also works from a
+  # systemd unit (the nightly upgrade below), where PATH is minimal.
   rebuild = pkgs.writeShellApplication {
     name = "rebuild";
-    runtimeInputs = [ config.nix.package ];
+    runtimeInputs = [ config.nix.package pkgs.coreutils ];
     text = ''
       action="''${1:-switch}"
       flake="''${2:-/etc/nixos#server}"
@@ -16,7 +20,7 @@ let
         switch|boot|test|dry-activate) ;;
         *) echo "usage: rebuild [switch|boot|test|dry-activate] [flake#name]" >&2; exit 2 ;;
       esac
-      [ "$(id -u)" = 0 ] || exec sudo "$0" "$@"
+      [ "$(id -u)" = 0 ] || exec /run/wrappers/bin/sudo "$0" "$@"
       out=$(nix build --no-link --print-out-paths \
               "''${flake%%#*}#nixosConfigurations.''${flake##*#}.config.system.build.toplevel")
       if [ "$action" != test ] && [ "$action" != dry-activate ]; then
@@ -99,7 +103,11 @@ in
     fsType = "vfat";
     options = [ "fmask=0077" "dmask=0077" ];
   };
-  swapDevices = [ ];
+  # zram (higher priority) absorbs everyday memory pressure. The 2 GB swap
+  # file exists only so that `rebuild` / the nightly upgrade can evaluate the
+  # configuration on 460 MB of RAM (peak swap use measured at ~550 MB). NixOS
+  # creates the file at boot if it is missing; it is idle otherwise.
+  swapDevices = [ { device = "/swapfile"; size = 2048; } ];
   zramSwap.enable = true;
 
   ### Networking #############################################################
@@ -178,10 +186,60 @@ in
     auto-optimise-store = true;
     trusted-users = [ "root" "@wheel" ];
   };
+  # Store maintenance. Old generations go after 7 days: with a nightly upgrade
+  # each one can be a few hundred MB on a 10 GB disk. GC also runs right after
+  # every successful upgrade (OnSuccess below). auto-optimise-store hard-links
+  # duplicates as paths are written; the weekly optimise pass catches the rest.
   nix.gc = {
     automatic = true;
     dates = "weekly";
-    options = "--delete-older-than 14d";
+    randomizedDelaySec = "30min";
+    options = "--delete-older-than 7d";
+  };
+  nix.optimise = {
+    automatic = true;
+    dates = [ "weekly" ];
+  };
+
+  ### Automatic upgrades #####################################################
+
+  # Nightly: update the nixpkgs input in /etc/nixos/flake.lock, build the new
+  # system and activate it. This is what system.autoUpgrade does, minus
+  # nixos-rebuild (127 MB of Python): `rebuild` does the work instead.
+  # If the kernel, modules or initrd changed the new system is booted into
+  # (reboot one minute later); otherwise it is a live switch.
+  #
+  # Note that `build.sh deploy` overwrites /etc/nixos, flake.lock included:
+  # copy the server's lock file into the repo first (or `nix flake update`
+  # there) so a deploy does not step back to an older nixpkgs.
+  systemd.services.nixos-upgrade = {
+    description = "NixOS upgrade: nix flake update + rebuild";
+    restartIfChanged = false;
+    unitConfig.X-StopOnRemoval = false;
+    unitConfig.OnSuccess = [ "nix-gc.service" ];
+    serviceConfig.Type = "oneshot";
+    environment.HOME = "/root";
+    path = [ config.nix.package rebuild pkgs.coreutils config.systemd.package ];
+    script = ''
+      cd /etc/nixos
+      nix flake update nixpkgs --flake /etc/nixos
+      rebuild boot
+      booted=$(readlink /run/booted-system/{initrd,kernel,kernel-modules})
+      built=$(readlink /nix/var/nix/profiles/system/{initrd,kernel,kernel-modules})
+      if [ "$booted" = "$built" ]; then
+        /nix/var/nix/profiles/system/bin/switch-to-configuration switch
+      else
+        echo "kernel, modules or initrd changed: rebooting in one minute"
+        shutdown -r +1
+      fi
+    '';
+    startAt = "04:40";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+  };
+  systemd.timers.nixos-upgrade.timerConfig = {
+    RandomizedDelaySec = "30min";
+    Persistent = true;
   };
 
   environment.systemPackages = with pkgs; [

@@ -102,9 +102,21 @@ back.
 To sync from this repo instead, `git clone` it to `/etc/nixos` (git is
 installed) and run `rebuild`.
 
-Evaluating the config takes ~600 MB of RAM, so on a 1 GB instance the
-intended workflow is to never rebuild on the server. Deploy from the dev VM
-with `nixos-rebuild --target-host`, which builds the x86_64 closure there
+Evaluating the config takes ~750 MB (230 MB resident, the rest swappable).
+`server.nix` therefore declares a 2 GB swap file that NixOS creates at boot;
+with it, `rebuild` takes ~2.5 min cold and ~40 s once nixpkgs is in the
+store, even on a 512 MB instance.
+
+Automatic upgrades: the `nixos-upgrade` timer (04:40 UTC daily, plus up to
+30 min of jitter) runs `nix flake update nixpkgs` in `/etc/nixos`, then
+`rebuild boot`. If the kernel, modules or initrd changed it reboots one
+minute later, otherwise it switches live. A garbage collection follows every
+successful run. Store maintenance: `nix.gc` weekly (`--delete-older-than 7d`),
+`nix.optimise` weekly, `auto-optimise-store` on write, GRUB keeps 5 entries.
+Watch it with `journalctl -u nixos-upgrade` and `systemctl list-timers`.
+
+Deploying from the dev VM is still the way to push config changes. It uses
+`nixos-rebuild --target-host`, which builds the x86_64 closure there
 (binfmt emulation), copies it with `nix copy` and activates it over SSH:
 
 ```sh
@@ -119,8 +131,12 @@ nixos-rebuild switch --flake .#server --target-host root@<ip>
 ```
 
 The dev VM's own SSH key is in `sshKeys` for this purpose. `build.sh deploy`
-also refreshes `/etc/nixos` on the server with the deployed sources, so the
-in-place `rebuild` remains available as a fallback.
+also refreshes `/etc/nixos` on the server with the deployed sources (a tar
+copy of the same file set as `packages.src`), which the nightly upgrade and
+`rebuild` read. That copy includes `flake.lock`, so before deploying, bring
+the repo's lock up to the server's (`scp root@<ip>:/etc/nixos/flake.lock .`)
+or run `nix flake update`; otherwise the deploy steps back to the older
+nixpkgs until the next nightly run.
 
 ## What was cut, and why
 

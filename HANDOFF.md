@@ -26,16 +26,34 @@ Installed closure: ~966 MiB (was 908 before headscale). Idle memory: ~135 MB use
 
 ## Day-to-day
 
-Change the config and deploy (the server never evaluates or builds anything; it only receives a closure):
+Change the config and deploy:
 
 ```sh
 vim modules/server.nix
+scp root@104.238.132.193:/etc/nixos/flake.lock .    # take the server's (nightly-updated) lock, see below
 SERVER=root@104.238.132.193 VM_PASS=<vm password> ./build.sh deploy         # switch now
 SERVER=root@104.238.132.193 VM_PASS=<vm password> ./build.sh deploy boot    # next reboot
 git commit -am "..." && git push
 ```
 
-Under the hood that is `nixos-rebuild switch --flake .#server --target-host root@<ip>` on the dev VM, then a refresh of `/etc/nixos` on the server. Without `VM_PASS`, key-based ssh to the VM is used.
+Under the hood that is `nixos-rebuild switch --flake .#server --target-host root@<ip>` on the dev VM, then a tar copy of the file set (flake, modules, build.sh, README, test) to `/etc/nixos` on the server. Without `VM_PASS`, key-based ssh to the VM is used.
+
+Since 2026-09-03 the server can also rebuild itself (2 GB swap file, see gotchas): copy the files and run `rebuild` there, which is what was done for that day's change:
+
+```sh
+tar cf - flake.nix flake.lock modules build.sh README.md test | ssh root@104.238.132.193 'rm -rf /etc/nixos && mkdir /etc/nixos && tar xf - -C /etc/nixos'
+ssh root@104.238.132.193 rebuild dry-activate    # ~2.5 min cold, ~40 s warm; then `rebuild` (switch) or `rebuild boot`
+```
+
+Automatic upgrades and store maintenance (all in `server.nix`, deployed 2026-09-03, generation 5):
+
+| Unit | When | What |
+|------|------|------|
+| `nixos-upgrade.timer` | daily 04:40 UTC + up to 30 min jitter, persistent | `nix flake update nixpkgs --flake /etc/nixos`, `rebuild boot`; reboots one minute later if kernel/modules/initrd changed, else live `switch-to-configuration switch`. `OnSuccess` starts `nix-gc.service` |
+| `nix-gc.timer` | weekly | `nix-collect-garbage --delete-older-than 7d` |
+| `nix-optimise.timer` | weekly | `nix-store --optimise` (on top of `auto-optimise-store`) |
+
+It is a hand-written unit, not `system.autoUpgrade`: that module hardcodes `nixos-rebuild` (127 MB of Python). The first manual run (`systemctl start nixos-upgrade`) found nixpkgs unchanged but still rebooted, correctly: the box had been live-switched since the ISO install and had never booted the headscale generation's initrd. Check on it with `journalctl -u nixos-upgrade` and `systemctl list-timers`. The server's `/etc/nixos/flake.lock` moves ahead of the repo's every night, hence the `scp` above before deploying.
 
 Rebuild the ISO (only needed for installing new machines; ~15 min under emulation):
 
@@ -71,7 +89,9 @@ Rescue: attach the ISO to the instance again and boot it. It auto-logs in as roo
 
 ## Gotchas learned today
 
-- Evaluating this config needs ~600 MB RAM, more than the 512 MB plan has. That is why the server never rebuilds itself. `rebuild` on the box exists as an emergency fallback only and will swap hard.
+- Evaluating this config needs ~750 MB (measured 2026-09-03 with `systemd-run --wait`: 230 MB resident, 550 MB swap peak). On zram alone it cannot fit; with the 2 GB `/swapfile` (`swapDevices` in server.nix, created by NixOS at boot, priority below zram) `rebuild` takes 2 min 16 s cold including the nixpkgs download, ~40 s warm, ~16 s with a warm eval cache. Headscale is not disturbed.
+- `/etc/nixos` on the server was found stale on 2026-09-03: it still had the placeholder headscale module (loopback :8080) while the running system was the TLS one; the last two deploys of 2026-09-02 had not refreshed it. A local `rebuild` from it would have dropped port 443. The deploy refresh is now a plain tar copy instead of a `nix build` of `packages.src`. If in doubt: `diff -r` the repo against `/etc/nixos` before running `rebuild` on the box.
+- The `rebuild` script originally had only nix on its PATH and failed under systemd (`id: command not found`); it now includes coreutils and calls `/run/wrappers/bin/sudo`.
 - Anything in the repo directory on the dev VM ends up inside the ISO if it is in the `src` file set; a disk image once added 800 MB to the ISO. `build.sh` now excludes `*.log`/`*.qcow2` and the file set is explicit, but keep junk out of `/home/realo/Data/Work/MINIMAL-SERVER`.
 - `nixos-rebuild build` in that directory overwrites the `result` symlink that `build.sh iso` also uses. Re-run `nix build .#packages.x86_64-linux.iso --out-link result` (instant when cached) to restore it.
 - The dev VM's login shell is fish. Remote one-liners must be wrapped in `bash -c` or piped to `bash -s`. sshpass needs `-o PubkeyAuthentication=no -o PreferredAuthentications=password` or the Mac's agent keys trip "too many authentication failures".
@@ -84,7 +104,8 @@ Rescue: attach the ISO to the instance again and boot it. It auto-logs in as roo
 - A stopped, unlabeled `vc2-1c-0.5gb` instance from 2017 (45.77.78.141, id `b3506f78-…`) is still in the account and still billed $3.50/month. Not touched. Destroy it if it is not needed.
 - The ISO in Vultr's panel is named after the CDN blob id (`501cb7f9-…`) rather than the `.iso` filename. Harmless.
 - The dev VM's nix store holds an unreferenced ~760 MB source copy that included the disk image; its daily GC (7 days) will remove it.
-- Firewall is on with 22, 80 and 443 open. No automatic upgrades, no monitoring; `nix.gc` runs weekly. **No backup of `/var/lib/headscale`** (SQLite db, noise key, ACME cache): losing it means re-registering every node.
+- Firewall is on with 22, 80 and 443 open. Nightly upgrades and weekly gc/optimise are in place (see Day-to-day); no monitoring, so a failed `nixos-upgrade.service` goes unnoticed unless you look at the journal. **No backup of `/var/lib/headscale`** (SQLite db, noise key, ACME cache): losing it means re-registering every node.
+- Disk: 3.3 GB used of 9.5 after the swap file and the nixpkgs source; each nightly upgrade that changes nixpkgs adds a generation until gc removes it after 7 days.
 - The QEMU expect test (`test/qemu-boot-test.sh`) prompt patterns were fixed but the script has not been run to completion since; it also now requires `CONSOLE_PASSWORD` because the server has no password.
 - Possible further trimming, not done: a custom kernel config (the 145 MB module tree is the single largest item) and dropping git/vim (~95 MB).
 

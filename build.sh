@@ -57,11 +57,12 @@ set -euo pipefail
 cd $VM_DIR
 export NIX_SSHOPTS="-o StrictHostKeyChecking=accept-new"
 nixos-rebuild $action --flake .#server --target-host $SERVER
-# Keep /etc/nixos on the server in sync with what was deployed.
-src=\$(nix build .#packages.x86_64-linux.src --no-link --print-out-paths)
-nix copy --to ssh://$SERVER "\$src"
-ssh -o StrictHostKeyChecking=accept-new $SERVER \
-  "rm -rf /etc/nixos && cp -rT '\$src' /etc/nixos && chmod -R u+w /etc/nixos"
+# Keep /etc/nixos on the server in sync with what was deployed: the same
+# files as packages.src, copied straight from the working tree (the nix
+# output was found stale once, so no nix in this step).
+tar cf - flake.nix flake.lock modules build.sh README.md test |
+  ssh -o StrictHostKeyChecking=accept-new $SERVER \
+    "rm -rf /etc/nixos && mkdir /etc/nixos && tar xf - -C /etc/nixos"
 EOF
     ;;
   *)
