@@ -158,6 +158,15 @@ Built once on the old box with its `klakegg/hugo:ext-pandoc` image (31 pages,
 | `/var/www/realo.ca` | the built site (root-owned, world-readable), what nginx serves |
 | `/home/realo/AGORA` | the whole tree from the old box: the `agora` Hugo source (git repo, themes, `ARCHIVE`, one uncommitted change in `content/project/_index.md`), 27 MB, owned by realo |
 
+The source repo's remote is `git@gitlab.com:realo/agora.git` (private,
+switched from https on 2026-09-03). The box has no GitLab credential: push by
+forwarding the Mac's agent through the dev VM (`ssh -A` on both hops, the
+Mac's ed25519 key is registered at GitLab) and running `git push` as root
+with `-c safe.directory=/home/realo/AGORA/agora`, then `chown -R realo:users
+.git`. Commits are made as realo (`sudo -u realo git -c user.name=... -c
+user.email=... commit`). Do not put `-n` in `GIT_SSH_COMMAND`: git needs
+ssh's stdin and GitLab then reports "user canceled the push".
+
 There is no hugo on this box. To publish a change: edit the source somewhere
 with hugo (the old box's docker image, or hugo on the Mac/dev VM), build with
 `hugo -d <dir>` (baseurl is `/`, so no URL to fix), and copy the output over
