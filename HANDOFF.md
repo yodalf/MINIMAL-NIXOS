@@ -130,6 +130,15 @@ serving a self-signed placeholder and the timer retries daily, which stays
 well under Let's Encrypt's 5 failed validations per hour; check
 `journalctl -u acme-order-renew-realo.ca.service`.
 
+Self-maintenance verified 2026-09-03 16:30 UTC with a manual
+`systemctl start nixos-upgrade`: 5 min 13 s wall (most of it unpacking
+nixpkgs into the git cache), 262 MB resident + 533 MB swap peak, nixpkgs was
+unchanged so it re-activated the same generation without a reboot, then
+`nix-gc` ran via `OnSuccess` (4498 paths, 202 MiB freed; disk 3.9 -> 3.3 GB).
+The box answers ssh slowly (10 s+) while the upgrade evaluates; use a
+generous `ConnectTimeout`. Timers: `nix-gc` daily ~00:00 UTC,
+`nixos-upgrade` daily ~04:40 UTC, `nix-optimise` weekly, all enabled.
+
 Access: ssh as root works from the dev VM (its "LOCK" key). The install was
 done by hand from the console/VM: `echo YES | vultr-install /dev/vda`, then
 `POST /v2/instances/<id>/iso/detach` from the Mac, then one
