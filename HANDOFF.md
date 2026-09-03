@@ -8,7 +8,9 @@ Date: 2026-09-03 (first written 2026-09-02). State at handoff: one server instal
 |-------|-------|-------|
 | Config repo | `~/Work/MINIMAL-NIXOS` on the Mac, mirror at https://github.com/yodalf/MINIMAL-NIXOS (public) | `main` branch, all work committed and pushed |
 | Installer ISO | GitHub release `v0.1`, also `out/` locally and `result/` on the dev VM | 497 MB, x86_64, hybrid BIOS+UEFI, installs offline |
-| Vultr instance | `minimal-server`, id `78bb9d0c-b470-4709-8987-ae2be76d2db2`, **104.238.132.193**, plan `vc2-1c-0.5gb` (1 vCPU, 512 MB, 10 GB), region `ewr` | $3.50/month, booted in legacy BIOS mode, generation 1 active |
+| Vultr instance (this branch) | label `realo-ca`, id `9e8112d0-9fad-4bff-ab5a-1f68cf42ef54`, **64.176.212.253**, plan `vc2-1c-0.5gb` (1 vCPU, 512 MB, 10 GB), region `ewr`, firewall group `realo-ca` (`f6f326a0-38d9-46db-8b9c-a1375cd678c8`: tcp 22/80/443 + ICMP, IPv4 only) | $3.50/month, legacy BIOS boot, installed 2026-09-03 from the v0.2 ISO, generation 1. See the realo.ca section at the end |
+| Vultr instance (headscale) | label `headscale`, id `78bb9d0c-b470-4709-8987-ae2be76d2db2`, **104.238.132.193**, same plan and region | Runs the `headscale` branch, which has its own handoff |
+| Installer ISO v0.2 | GitHub release `v0.2` (530 MB, built from this branch), Vultr ISO id `1c4d24f5-9039-4ee5-99da-42b2e0f1f928` | Installs the realo-ca system offline. v0.1 (26.05, generic) is still registered at Vultr too; the account allows 2 ISOs, so delete one before registering another |
 | Dev/build VM | `realo@192.168.2.199` (NixOS aarch64, hostname realix) | Builds everything under x86_64 binfmt emulation. Work dir `/home/realo/Data/Work/MINIMAL-SERVER`. Its own NixOS config is off limits |
 | Vultr API key | `~/.config/vultr/api_key` on the Mac (mode 600) | Access-controlled to the home IP 70.31.223.159 in the Vultr panel |
 
@@ -105,3 +107,44 @@ Rescue: attach the ISO to the instance again and boot it. It auto-logs in as roo
 - Disk: 4.3 GB used of 9.5 (swap file, nixpkgs source, the 26.05 and 26.11 closures side by side); each nightly upgrade that changes nixpkgs adds a generation until gc removes it after 2 days. Generations 1 to 7 (the 26.05 ones) go at the 2026-09-05 run.
 - The QEMU expect test (`test/qemu-boot-test.sh`) prompt patterns were fixed but the script has not been run to completion since; it also now requires `CONSOLE_PASSWORD` because the server has no password.
 - Possible further trimming, not done: a custom kernel config (the 145 MB module tree is the single largest item) and dropping git/vim (~95 MB).
+
+## realo.ca (branch `realo-ca`, installed 2026-09-03)
+
+`modules/realo-ca.nix`, imported by the `server` config in `flake.nix`, sets
+`networking.hostName = "realo-ca"` (server.nix's hostname is a `mkDefault`)
+and runs nginx: `forceSSL` virtual host `realo.ca`, document root
+`/var/www/realo.ca` (created once by tmpfiles with a placeholder page, never
+overwritten afterwards; put real content there), ports 80 and 443 open on the
+box and in the Vultr firewall group `realo-ca`. The web server is a
+placeholder choice: replace the `services.nginx` block with whatever is
+decided; the ACME part stays as long as something on :80 serves
+`/.well-known/acme-challenge/` from the acme module's webroot.
+
+TLS: `security.acme` (lego) with `acceptTerms`, account email
+`real@realo.ca`, HTTP-01 through nginx (`enableACME`). **The certificate is
+not issued yet**: on 2026-09-03 `realo.ca` still resolves to 45.77.78.141, the
+old stopped 2017 instance, so `acme-order-renew-realo.ca.service` fails
+("Failed to fetch certificates") and nginx serves a self-signed placeholder.
+The unit has no automatic restart; `acme-renew-realo.ca.timer` retries daily,
+which stays well under Let's Encrypt's 5 failed validations per hour. To get
+the real certificate:
+
+```sh
+# 1. at Dyn: realo.ca A -> 64.176.212.253, then wait until this returns it
+dig +short realo.ca
+# 2. on the server (from the dev VM, see Access below)
+systemctl start acme-order-renew-realo.ca.service && systemctl status acme-order-renew-realo.ca.service
+curl -sI https://realo.ca | head -1
+```
+
+Access: ssh as root works from the dev VM (its "LOCK" key). The install was
+done by hand from the console/VM: `echo YES | vultr-install /dev/vda`, then
+`POST /v2/instances/<id>/iso/detach` from the Mac, then one
+`SERVER=root@64.176.212.253 VM_PASS=... ./build.sh deploy` (which found the
+ISO's closure already active). Verified 2026-09-03: hostname `realo-ca`,
+nginx listening on 80/443, http redirects to https, the placeholder page is
+served, ping ok, 3.1 GB of 9.5 used, 118 MB memory used.
+
+Not done: real content, the choice of web server, `www.realo.ca`, and
+anything backup-related (nothing on the box needs one until content exists;
+`/var/lib/acme` is re-creatable).
