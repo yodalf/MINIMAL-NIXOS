@@ -1,7 +1,7 @@
 # Handoff: minimal NixOS server on Vultr, running headscale
 
 Date: 2026-09-03 (first written 2026-09-02). State at handoff: one server
-installed and deployed to, generation 8, NixOS 26.11pre from nixos-unstable;
+installed and deployed to, generation 10, NixOS 26.11pre from nixos-unstable;
 it runs headscale 0.29.3 at https://hs.realo.ca with three nodes connected
 (branch `headscale`, see the section at the end). It upgrades itself nightly
 and collects garbage daily, and snapshots the headscale state daily (pull with `build.sh backup`).
@@ -16,8 +16,9 @@ and collects garbage daily, and snapshots the headscale state daily (pull with `
 | DNS | `hs.realo.ca` A -> 104.238.132.193 | Dyn Standard DNS (account.dyn.com, Zone Level Services > realo.ca). Vultr IPs are static for the instance's lifetime, no DDNS needed |
 | Dev/build VM | `realo@192.168.2.199` (NixOS aarch64, hostname realix) | Builds everything under x86_64 binfmt emulation. Work dir `/home/realo/Data/Work/MINIMAL-SERVER`. Its own NixOS config lives in the realix-iso repo (`/home/realo/Data/Work/realix-iso`, GitHub yodalf/realix-iso) and is updated with `sudo /etc/nixos/update.sh`. Key login is refused: `build.sh` needs `VM_PASS`. Also a tailnet node, `realix.ts.realo.ca` |
 | Vultr API key | `~/.config/vultr/api_key` on the Mac (mode 600) | Access-controlled to the home IP 70.31.223.159 in the Vultr panel |
+| Backups | `/var/backups/headscale/*.tar.gz` on the server (daily, 30 kept); copies in `~/Backups/headscale/headscale/` on the Mac | Pulled by hand with `SERVER=root@104.238.132.193 ./build.sh backup`; last pull 2026-09-03. Restore steps in the headscale section |
 
-Installed closure: ~976 MiB (908 before headscale, 966 on 26.05). Idle memory: ~135 MB used of 460 MB. Disk: 4.3 GB of 9.5 used (2 GB of it the swap file).
+Installed closure: ~976 MiB (908 before headscale, 966 on 26.05). Idle memory: ~135 MB used of 460 MB. Disk: 4.8 GB of 9.5 used (2 GB of it the swap file; drops once the 26.05 generations are collected on 2026-09-05).
 
 ## How it fits together
 
@@ -47,7 +48,7 @@ tar cf - flake.nix flake.lock modules build.sh README.md test | ssh root@104.238
 ssh root@104.238.132.193 rebuild dry-activate    # ~2.5 min cold, ~40 s warm; then `rebuild` (switch) or `rebuild boot`
 ```
 
-Automatic upgrades and store maintenance (all in `server.nix`, first deployed 2026-09-03 as generation 5; gc made daily and retention cut to 2 days later that day, generation 8):
+Automatic upgrades and store maintenance (all in `server.nix`, first deployed 2026-09-03 as generation 5; gc made daily and retention cut to 2 days later that day; the backup timer came with generation 10):
 
 | Unit | When | What |
 |------|------|------|
