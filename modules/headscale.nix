@@ -65,6 +65,49 @@ in
   # to the unix socket in /run/headscale, which is group-readable.
   users.users.realo.extraGroups = [ "headscale" ];
 
+  ### Backup #################################################################
+
+  # Daily snapshot of /var/lib/headscale into /var/backups/headscale (30 kept,
+  # ~100 KB each): the SQLite db via the online backup API (consistent while
+  # headscale runs; never copy the raw file), the noise private key (server
+  # identity every client pinned; without it or the db every node must be
+  # re-registered) and the ACME cache. The server cannot reach the Mac or the
+  # dev VM, so this is pulled from the Mac with `build.sh backup`.
+  #
+  # Restore: systemctl stop headscale; rm -rf /var/lib/headscale/*;
+  #          tar -C /var/lib -xzf <snapshot>; chown -R headscale:headscale /var/lib/headscale
+  #          systemctl start headscale
+  systemd.services.headscale-backup = {
+    description = "Snapshot /var/lib/headscale";
+    # After the nightly gc (00:00) and before the nightly upgrade (04:40).
+    startAt = "03:00";
+    path = [ pkgs.sqlite pkgs.gnutar pkgs.gzip pkgs.coreutils pkgs.findutils ];
+    serviceConfig.Type = "oneshot";
+    script = ''
+      src=/var/lib/headscale
+      dir=/var/backups/headscale
+      stamp=$(date -u +%Y%m%d-%H%M%S)
+      work=$(mktemp -d)
+      trap 'rm -rf "$work"' EXIT
+
+      cp -a "$src" "$work/headscale"
+      rm -f "$work"/headscale/db.sqlite*
+      sqlite3 "$src/db.sqlite" ".backup '$work/headscale/db.sqlite'"
+      chmod 600 "$work/headscale/db.sqlite"
+
+      mkdir -p "$dir"
+      chmod 700 "$dir"
+      tar -C "$work" -czf "$dir/headscale-$stamp.tar.gz" headscale
+      ln -sfn "headscale-$stamp.tar.gz" "$dir/latest.tar.gz"
+      ls -1t "$dir"/headscale-*.tar.gz | tail -n +31 | xargs -r rm -f
+      echo "wrote $dir/headscale-$stamp.tar.gz ($(stat -c %s "$dir/headscale-$stamp.tar.gz") bytes)"
+    '';
+  };
+  systemd.timers.headscale-backup.timerConfig = {
+    RandomizedDelaySec = "10min";
+    Persistent = true;
+  };
+
   ### Using it ###############################################################
   #
   # On the box:  headscale users create <name>

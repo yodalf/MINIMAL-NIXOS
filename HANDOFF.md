@@ -4,7 +4,7 @@ Date: 2026-09-03 (first written 2026-09-02). State at handoff: one server
 installed and deployed to, generation 8, NixOS 26.11pre from nixos-unstable;
 it runs headscale 0.29.3 at https://hs.realo.ca with three nodes connected
 (branch `headscale`, see the section at the end). It upgrades itself nightly
-and collects garbage daily.
+and collects garbage daily, and snapshots the headscale state daily (pull with `build.sh backup`).
 
 ## What exists
 
@@ -54,6 +54,7 @@ Automatic upgrades and store maintenance (all in `server.nix`, first deployed 20
 | `nixos-upgrade.timer` | daily 04:40 UTC + up to 30 min jitter, persistent | `nix flake update nixpkgs --flake /etc/nixos`, `rebuild boot`; reboots one minute later if kernel/modules/initrd changed, else live `switch-to-configuration switch`. `OnSuccess` starts `nix-gc.service` |
 | `nix-gc.timer` | daily 00:00 UTC + up to 30 min jitter, persistent | `nix-collect-garbage --delete-older-than 2d` (tested by hand 2026-09-03: 651 MB freed, 18 s; generations under 2 days are kept) |
 | `nix-optimise.timer` | weekly | `nix-store --optimise` (on top of `auto-optimise-store`) |
+| `headscale-backup.timer` | daily 03:00 UTC + up to 10 min jitter | snapshot of `/var/lib/headscale` to `/var/backups/headscale`, 30 kept (headscale.nix; see the headscale section) |
 
 It is a hand-written unit, not `system.autoUpgrade`: that module hardcodes `nixos-rebuild` (127 MB of Python). The first manual run (`systemctl start nixos-upgrade`) found nixpkgs unchanged but still rebooted, correctly: the box had been live-switched since the ISO install and had never booted the headscale generation's initrd. Check on it with `journalctl -u nixos-upgrade` and `systemctl list-timers`. The server's `/etc/nixos/flake.lock` moves ahead of the repo's every night, hence the `scp` above before deploying.
 
@@ -106,7 +107,7 @@ Rescue: attach the ISO to the instance again and boot it. It auto-logs in as roo
 - A stopped, unlabeled `vc2-1c-0.5gb` instance from 2017 (45.77.78.141, id `b3506f78-…`) is still in the account and still billed $3.50/month. Not touched. Destroy it if it is not needed.
 - The ISO in Vultr's panel is named after the CDN blob id (`501cb7f9-…`) rather than the `.iso` filename. Harmless.
 - The dev VM's nix store holds an unreferenced ~760 MB source copy that included the disk image; its daily GC (7 days) will remove it.
-- Firewall is on with 22, 80 and 443 open. Nightly upgrades, daily gc and weekly optimise are in place (see Day-to-day); no monitoring, so a failed `nixos-upgrade.service` goes unnoticed unless you look at the journal. **No backup of `/var/lib/headscale`** (SQLite db, noise key, ACME cache): losing it means re-registering every node.
+- Firewall is on with 22, 80 and 443 open. Nightly upgrades, daily gc and weekly optimise are in place (see Day-to-day); no monitoring, so a failed `nixos-upgrade.service` or `headscale-backup.service` goes unnoticed unless you look at the journal. `/var/lib/headscale` is snapshotted daily on the box (see the headscale section); the off-box copy depends on someone running `build.sh backup` on the Mac.
 - Disk: 4.3 GB used of 9.5 (swap file, nixpkgs source, the 26.05 and 26.11 closures side by side); each nightly upgrade that changes nixpkgs adds a generation until gc removes it after 2 days. Generations 1 to 7 (the 26.05 ones) go at the 2026-09-05 run.
 - The QEMU expect test (`test/qemu-boot-test.sh`) prompt patterns were fixed but the script has not been run to completion since; it also now requires `CONSOLE_PASSWORD` because the server has no password.
 - Possible further trimming, not done: a custom kernel config (the 145 MB module tree is the single largest item) and dropping git/vim (~95 MB).
@@ -188,5 +189,28 @@ harmless to lose, headscale re-requests). Back up the db with
 `sqlite3 db.sqlite ".backup <file>"` or with headscale stopped, never by
 copying the raw file while it runs.
 
-Not done: backups of `/var/lib/headscale`; an ACL policy (all nodes of
-`realo` can reach each other, which is the default).
+Backups (since 2026-09-03): `headscale-backup.timer` (03:00 UTC daily, up to
+10 min jitter, persistent) writes `/var/backups/headscale/headscale-<utc
+stamp>.tar.gz` (~9 KB; `latest.tar.gz` points at the newest, 30 kept). Each
+holds a consistent `db.sqlite` made with sqlite's online backup API,
+`noise_private.key` and `.cache/` (ACME). The server cannot reach the Mac or
+the dev VM, so the off-box copy is a pull from the Mac:
+
+```sh
+SERVER=root@104.238.132.193 ./build.sh backup     # -> ~/Backups/headscale/headscale/*.tar.gz (BACKUP_DIR overrides)
+```
+
+Run it now and then (a launchd job on the Mac would automate it; not set up).
+Verified 2026-09-03: `pragma integrity_check` ok on the snapshot db, 3 nodes.
+Restore, on the server:
+
+```sh
+systemctl stop headscale
+rm -rf /var/lib/headscale/* /var/lib/headscale/.cache
+tar -C /var/lib -xzf /var/backups/headscale/<snapshot>.tar.gz   # or one copied back from the Mac
+chown -R headscale:headscale /var/lib/headscale
+systemctl start headscale
+```
+
+Not done: an ACL policy (all nodes of `realo` can reach each other, which is
+the default).
