@@ -192,7 +192,7 @@ in
   # duplicates as paths are written; the weekly optimise pass catches the rest.
   nix.gc = {
     automatic = true;
-    dates = "weekly";
+    dates = "daily";
     randomizedDelaySec = "30min";
     options = "--delete-older-than 7d";
   };
