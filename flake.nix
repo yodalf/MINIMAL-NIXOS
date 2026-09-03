@@ -1,7 +1,7 @@
 {
   description = "Minimal NixOS server for Vultr (x86_64, text-only, virtio-only)";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
   outputs = { self, nixpkgs, ... }:
     let

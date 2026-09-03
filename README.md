@@ -11,7 +11,7 @@ Closure of the installed system: **~900 MiB**. Installer ISO: **~500 MB**
 
 | File | Purpose |
 |------|---------|
-| `flake.nix` | Pins nixpkgs `nixos-26.05`; exposes `server` and `installer` configs and the `iso` package |
+| `flake.nix` | Follows nixpkgs `nixos-unstable` (was `nixos-26.05` until 2026-09-03); exposes `server` and `installer` configs and the `iso` package |
 | `modules/server.nix` | The system that gets installed. Add services here or in a new module |
 | `modules/installer.nix` | Live ISO carrying the prebuilt `server` closure and a `vultr-install` script |
 | `build.sh` | Syncs the repo to the NixOS dev VM and builds there (the ISO is x86_64; the VM builds it via binfmt emulation) |
