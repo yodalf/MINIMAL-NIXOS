@@ -145,6 +145,29 @@ ISO's closure already active). Verified 2026-09-03: hostname `realo-ca`,
 nginx listening on 80/443, http redirects to https, the placeholder page is
 served, ping ok, 3.1 GB of 9.5 used, 118 MB memory used.
 
-Not done: real content, the choice of web server, `www.realo.ca`, and
-anything backup-related (nothing on the box needs one until content exists;
-`/var/lib/acme` is re-creatable).
+Content (migrated 2026-09-03): the site is the Hugo site from the old
+instance `totos` (45.77.78.141, Arch Linux, compose project
+`/home/realo/AGORA/agora`, served there by `hugo server` behind Traefik).
+Built once on the old box with its `klakegg/hugo:ext-pandoc` image (31 pages,
+3 MB) and copied here:
+
+| Where | What |
+|-------|------|
+| `/var/www/realo.ca` | the built site (root-owned, world-readable), what nginx serves |
+| `/home/realo/AGORA` | the whole tree from the old box: the `agora` Hugo source (git repo, themes, `ARCHIVE`, one uncommitted change in `content/project/_index.md`), 27 MB, owned by realo |
+
+There is no hugo on this box. To publish a change: edit the source somewhere
+with hugo (the old box's docker image, or hugo on the Mac/dev VM), build with
+`hugo -d <dir>` (baseurl is `/`, so no URL to fix), and copy the output over
+`/var/www/realo.ca` via the dev VM (`tar | ssh root@64.176.212.253`, the
+server has no rsync).
+
+Old-box gotcha: `totos` runs `ddclient`, which sets the `realo.ca` A record
+at Dyn to 45.77.78.141 (journal 2026-09-03 09:03 "IPv4 address set to
+45.77.78.141"). It must be disabled there (`sudo systemctl disable --now
+ddclient`, root needed) before the record is moved, or it will move it back.
+The new box needs no ddclient: Vultr IPs are static for the instance's life.
+
+Not done: `www.realo.ca` and `whoami.realo.ca` (the old Traefik rules), the
+choice of a final web server, and a backup of `/home/realo/AGORA` beyond the
+copy still sitting on the old instance.
