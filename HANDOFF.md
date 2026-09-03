@@ -50,7 +50,7 @@ Automatic upgrades and store maintenance (all in `server.nix`, deployed 2026-09-
 | Unit | When | What |
 |------|------|------|
 | `nixos-upgrade.timer` | daily 04:40 UTC + up to 30 min jitter, persistent | `nix flake update nixpkgs --flake /etc/nixos`, `rebuild boot`; reboots one minute later if kernel/modules/initrd changed, else live `switch-to-configuration switch`. `OnSuccess` starts `nix-gc.service` |
-| `nix-gc.timer` | daily 00:00 UTC + up to 30 min jitter | `nix-collect-garbage --delete-older-than 7d` |
+| `nix-gc.timer` | daily 00:00 UTC + up to 30 min jitter | `nix-collect-garbage --delete-older-than 2d` |
 | `nix-optimise.timer` | weekly | `nix-store --optimise` (on top of `auto-optimise-store`) |
 
 It is a hand-written unit, not `system.autoUpgrade`: that module hardcodes `nixos-rebuild` (127 MB of Python). The first manual run (`systemctl start nixos-upgrade`) found nixpkgs unchanged but still rebooted, correctly: the box had been live-switched since the ISO install and had never booted the headscale generation's initrd. Check on it with `journalctl -u nixos-upgrade` and `systemctl list-timers`. The server's `/etc/nixos/flake.lock` moves ahead of the repo's every night, hence the `scp` above before deploying.
@@ -105,7 +105,7 @@ Rescue: attach the ISO to the instance again and boot it. It auto-logs in as roo
 - The ISO in Vultr's panel is named after the CDN blob id (`501cb7f9-…`) rather than the `.iso` filename. Harmless.
 - The dev VM's nix store holds an unreferenced ~760 MB source copy that included the disk image; its daily GC (7 days) will remove it.
 - Firewall is on with 22, 80 and 443 open. Nightly upgrades, daily gc and weekly optimise are in place (see Day-to-day); no monitoring, so a failed `nixos-upgrade.service` goes unnoticed unless you look at the journal. **No backup of `/var/lib/headscale`** (SQLite db, noise key, ACME cache): losing it means re-registering every node.
-- Disk: 3.3 GB used of 9.5 after the swap file and the nixpkgs source; each nightly upgrade that changes nixpkgs adds a generation until gc removes it after 7 days.
+- Disk: 3.3 GB used of 9.5 after the swap file and the nixpkgs source; each nightly upgrade that changes nixpkgs adds a generation until gc removes it after 2 days.
 - The QEMU expect test (`test/qemu-boot-test.sh`) prompt patterns were fixed but the script has not been run to completion since; it also now requires `CONSOLE_PASSWORD` because the server has no password.
 - Possible further trimming, not done: a custom kernel config (the 145 MB module tree is the single largest item) and dropping git/vim (~95 MB).
 

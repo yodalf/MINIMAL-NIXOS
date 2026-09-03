@@ -111,7 +111,7 @@ Automatic upgrades: the `nixos-upgrade` timer (04:40 UTC daily, plus up to
 30 min of jitter) runs `nix flake update nixpkgs` in `/etc/nixos`, then
 `rebuild boot`. If the kernel, modules or initrd changed it reboots one
 minute later, otherwise it switches live. A garbage collection follows every
-successful run. Store maintenance: `nix.gc` daily (`--delete-older-than 7d`),
+successful run. Store maintenance: `nix.gc` daily (`--delete-older-than 2d`),
 `nix.optimise` weekly, `auto-optimise-store` on write, GRUB keeps 5 entries.
 Watch it with `journalctl -u nixos-upgrade` and `systemctl list-timers`.
 

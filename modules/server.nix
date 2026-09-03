@@ -186,7 +186,7 @@ in
     auto-optimise-store = true;
     trusted-users = [ "root" "@wheel" ];
   };
-  # Store maintenance. Old generations go after 7 days: with a nightly upgrade
+  # Store maintenance. Old generations go after 2 days: with a nightly upgrade
   # each one can be a few hundred MB on a 10 GB disk. GC also runs right after
   # every successful upgrade (OnSuccess below). auto-optimise-store hard-links
   # duplicates as paths are written; the weekly optimise pass catches the rest.
@@ -194,7 +194,7 @@ in
     automatic = true;
     dates = "daily";
     randomizedDelaySec = "30min";
-    options = "--delete-older-than 7d";
+    options = "--delete-older-than 2d";
   };
   nix.optimise = {
     automatic = true;
