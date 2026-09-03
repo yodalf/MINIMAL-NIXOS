@@ -21,7 +21,7 @@ Installed closure: ~966 MiB (was 908 before headscale). Idle memory: ~135 MB use
 
 - `modules/headscale.nix` is this machine's role (see the headscale section below). `modules/server.nix` is the generic box: virtio-only initrd, hybrid GRUB on `/dev/vda` with an ESP at `/boot`, systemd-networkd + DHCP, sshd (key only), zram swap, no firmware, no docs, no nixpkgs source in the closure, no Python (`nixos-rebuild` disabled, tiny `rebuild` script instead), no LVM, no guest agent.
 - `modules/installer.nix` is the live ISO: `iso-image.nix` + `profiles/minimal.nix` only. It embeds the prebuilt server closure and a `vultr-install` script that partitions the disk (1 M BIOS boot, 256 M ESP, rest ext4 labelled `nixos`), runs `nixos-install --system <closure>` and copies the repo to `/etc/nixos`. No network needed.
-- `flake.nix` pins nixpkgs `nixos-26.05`. `packages.x86_64-linux.{iso,server,src}`. `src` is an explicit file set so nothing stray in the directory ends up in the ISO.
+- `flake.nix` follows nixpkgs `nixos-unstable` (switched from `nixos-26.05` on 2026-09-03; `system.stateVersion` stays 26.05). `packages.x86_64-linux.{iso,server,src}`. `src` is an explicit file set so nothing stray in the directory ends up in the ISO.
 - `build.sh` rsyncs the repo to the VM and runs everything there: `eval`, `server`, `iso`, `test`, `deploy`.
 
 ## Day-to-day
@@ -112,7 +112,7 @@ Rescue: attach the ISO to the instance again and boot it. It auto-logs in as roo
 ## Headscale (branch `headscale`, deployed 2026-09-02)
 
 `modules/headscale.nix`, imported by the `server` config in `flake.nix`,
-enables `services.headscale` (headscale 0.28.0 from nixpkgs 26.05) and sets
+enables `services.headscale` (headscale 0.29.3 from nixos-unstable since 2026-09-03; 0.28.0 under 26.05 before, the SQLite db migrated on first start with no manual step) and sets
 `networking.hostName = "headscale"` (server.nix's hostname is now a
 `mkDefault`). Settings that matter:
 
