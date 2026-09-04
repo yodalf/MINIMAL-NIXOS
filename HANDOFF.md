@@ -1,7 +1,7 @@
 # Handoff: minimal NixOS server on Vultr, running headscale
 
-Date: 2026-09-03 (first written 2026-09-02). State at handoff: one server
-installed and deployed to, generation 10, NixOS 26.11pre from nixos-unstable;
+Date: 2026-09-04 (first written 2026-09-02). State at handoff: one server
+installed and deployed to, generation 12 (Quad9 DNS for clients), NixOS 26.11pre from nixos-unstable;
 it runs headscale 0.29.3 at https://hs.realo.ca with three nodes connected
 (branch `headscale`, see the section at the end). It upgrades itself nightly
 and collects garbage daily, and snapshots the headscale state daily (pull with `build.sh backup`).
@@ -127,7 +127,7 @@ enables `services.headscale` (headscale 0.29.3 from nixos-unstable since 2026-09
 | listener | `0.0.0.0:443` | module grants `CAP_NET_BIND_SERVICE` for ports < 1024 |
 | TLS | `tls_letsencrypt_hostname` + HTTP-01 on port 80 | headscale's built-in ACME client; cert cached in `/var/lib/headscale/.cache`, renews itself. Current cert expires 2026-12-01 |
 | `dns.base_domain` | `ts.realo.ca` (`baseDomain` in the module) | MagicDNS suffix, tailnet-internal only, no public record. Must differ from and not be a parent of hs.realo.ca |
-| `dns.nameservers.global` | 1.1.1.1, 1.0.0.1 with `override_local_dns` | clients use these while connected |
+| `dns.nameservers.global` | Quad9 secured: 9.9.9.9, 149.112.112.112, 2620:fe::fe, 2620:fe::9 with `override_local_dns` (since 2026-09-04; Cloudflare before) | clients use these while connected. Plain addresses: Tailscale knows them and upgrades to DoH (dns.quad9.net) on the client, no URL needed. Check with `tailscale dns status` on a node |
 | DERP | Tailscale's public relay map, auto-updated | no embedded DERP on 512 MB |
 | database | SQLite, `/var/lib/headscale/db.sqlite` | |
 | `unix_socket_permission` | `"0770"` | without it headscale chmods its CLI socket to 0700 and only root can use the CLI |

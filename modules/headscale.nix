@@ -32,7 +32,13 @@ in
         magic_dns = true;
         base_domain = baseDomain;
         override_local_dns = true;
-        nameservers.global = [ "1.1.1.1" "1.0.0.1" ];
+        # Quad9 secured (malware blocking, DNSSEC, no ECS). Plain addresses
+        # on purpose: these four are in Tailscale's built-in resolver table,
+        # so every client upgrades them to DNS-over-HTTPS at
+        # https://dns.quad9.net/dns-query by itself. Do not "fix" this by
+        # putting the https URL here; headscale only needs URLs for
+        # providers Tailscale cannot map from an address (e.g. NextDNS).
+        nameservers.global = [ "9.9.9.9" "149.112.112.112" "2620:fe::fe" "2620:fe::9" ];
       };
 
       # Public Tailscale DERP relays; no embedded DERP server on a 512 MB box.
