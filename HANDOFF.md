@@ -156,7 +156,7 @@ Built once on the old box with its `klakegg/hugo:ext-pandoc` image (31 pages,
 | Where | What |
 |-------|------|
 | `/var/www/realo.ca` | the built site (root-owned, world-readable), what nginx serves |
-| `/home/realo/AGORA` | the whole tree from the old box: the `agora` Hugo source (git repo, themes, `ARCHIVE`, one uncommitted change in `content/project/_index.md`), 27 MB, owned by realo |
+| `/home/realo/AGORA` | the whole tree from the old box: the `agora` Hugo source (git repo on `master`, clean and in sync with GitLab at 2d974ca as of 2026-09-03 evening; themes, `ARCHIVE`), 27 MB, owned by realo |
 
 The source repo's remote is `git@gitlab.com:realo/agora.git` (private,
 switched from https on 2026-09-03). The box has no GitLab credential: push by
@@ -179,6 +179,16 @@ not disabled inside it: the realo account's sudo password is not known to
 this workflow). If it is ever started again, disable ddclient first or it
 will move the record back. The new box needs no ddclient: Vultr IPs are
 static for the instance's life.
+
+Edits made straight on the served files on 2026-09-03 (both also in git, so a
+rebuild from `master` reproduces them): the Speak White link on the Links
+page (commit 61f5bef), and the removal of a stray "[github:8748457]" from the
+projects subtitle in `project/index.html`, which the old box's build had
+picked up from an uncommitted edit (that edit was committed as 6472b42 by
+mistake and reverted in 2d974ca). Lesson: build from a clean checkout, not
+from the old box's working tree. The Mac's clone `~/Work/agora` (same
+directory as `~/Work/AGORA`, case-insensitive filesystem) uses the ssh remote
+and is at 2d974ca too.
 
 Not done: `www.realo.ca` and `whoami.realo.ca` (the old Traefik rules), the
 choice of a final web server, and a backup of `/home/realo/AGORA` beyond the
