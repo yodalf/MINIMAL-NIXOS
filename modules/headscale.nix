@@ -32,13 +32,18 @@ in
         magic_dns = true;
         base_domain = baseDomain;
         override_local_dns = true;
-        # Quad9 secured (malware blocking, DNSSEC, no ECS). Plain addresses
-        # on purpose: these four are in Tailscale's built-in resolver table,
-        # so every client upgrades them to DNS-over-HTTPS at
-        # https://dns.quad9.net/dns-query by itself. Do not "fix" this by
-        # putting the https URL here; headscale only needs URLs for
-        # providers Tailscale cannot map from an address (e.g. NextDNS).
-        nameservers.global = [ "9.9.9.9" "149.112.112.112" "2620:fe::fe" "2620:fe::9" ];
+        # The kiosk Pi's Pi-hole, reached over the tailnet (node "kiosk",
+        # 100.64.0.5). It filters, then forwards through a local unbound to
+        # Quad9 over DNS-over-TLS (9.9.9.9 / 149.112.112.112, dns.quad9.net),
+        # so clients get ad blocking plus an encrypted upstream. The Pi runs
+        # tailscale with --accept-dns=false so it never points at itself.
+        # If the Pi is down, every node that accepts DNS loses resolution:
+        # fall back to Quad9 directly by swapping the two lines below.
+        # (Those four plain addresses are in Tailscale's built-in resolver
+        # table, so clients upgrade them to DoH at dns.quad9.net themselves;
+        # do not put the https URL here.)
+        nameservers.global = [ "100.64.0.5" ];
+        # nameservers.global = [ "9.9.9.9" "149.112.112.112" "2620:fe::fe" "2620:fe::9" ];
       };
 
       # Public Tailscale DERP relays; no embedded DERP server on a 512 MB box.

@@ -1,8 +1,8 @@
 # Handoff: minimal NixOS server on Vultr, running headscale
 
-Date: 2026-09-04 (first written 2026-09-02). State at handoff: one server
-installed and deployed to, generation 12 (Quad9 DNS for clients), NixOS 26.11pre from nixos-unstable;
-it runs headscale 0.29.3 at https://hs.realo.ca with three nodes connected
+Date: 2026-09-07 (first written 2026-09-02). State at handoff: one server
+installed and deployed to, generation 14 (tailnet DNS = the kiosk Pi-hole, see below), NixOS 26.11pre from nixos-unstable;
+it runs headscale 0.29.3 at https://hs.realo.ca with five nodes connected
 (branch `headscale`, see the section at the end). It upgrades itself nightly
 and collects garbage daily, and snapshots the headscale state daily (pull with `build.sh backup`).
 
@@ -96,6 +96,8 @@ Rescue: attach the ISO to the instance again and boot it. It auto-logs in as roo
 
 - Evaluating this config needs ~750 MB (measured 2026-09-03 with `systemd-run --wait`: 230 MB resident, 550 MB swap peak). On zram alone it cannot fit; with the 2 GB `/swapfile` (`swapDevices` in server.nix, created by NixOS at boot, priority below zram) `rebuild` takes 2 min 16 s cold including the nixpkgs download, ~40 s warm, ~16 s with a warm eval cache. Headscale is not disturbed.
 - `/etc/nixos` on the server was found stale on 2026-09-03: it still had the placeholder headscale module (loopback :8080) while the running system was the TLS one; the last two deploys of 2026-09-02 had not refreshed it. A local `rebuild` from it would have dropped port 443. The deploy refresh is now a plain tar copy instead of a `nix build` of `packages.src`. If in doubt: `diff -r` the repo against `/etc/nixos` before running `rebuild` on the box.
+- Found stale again on 2026-09-07, and this time the cause: inside the `build.sh deploy` heredoc, the ssh that `nixos-rebuild --target-host` opens reads the rest of the script from stdin, so the tar step after it never ran. Fixed with `</dev/null` on the `nixos-rebuild` line. This matters because the nightly upgrade builds from `/etc/nixos`: a stale copy there silently reverts whatever the last deploy changed.
+- nixpkgs removed `services.journald.extraConfig` between 2026-09-04 and 09-05 (assertion: use `services.journald.settings.Journal`). The nightly upgrade failed on 09-05, 09-06 and 09-07 until `server.nix` was changed; nothing warns about this except `journalctl -u nixos-upgrade`.
 - The `rebuild` script originally had only nix on its PATH and failed under systemd (`id: command not found`); it now includes coreutils and calls `/run/wrappers/bin/sudo`.
 - Anything in the repo directory on the dev VM ends up inside the ISO if it is in the `src` file set; a disk image once added 800 MB to the ISO. `build.sh` now excludes `*.log`/`*.qcow2` and the file set is explicit, but keep junk out of `/home/realo/Data/Work/MINIMAL-SERVER`.
 - `nixos-rebuild build` in that directory overwrites the `result` symlink that `build.sh iso` also uses. Re-run `nix build .#packages.x86_64-linux.iso --out-link result` (instant when cached) to restore it.
@@ -127,7 +129,7 @@ enables `services.headscale` (headscale 0.29.3 from nixos-unstable since 2026-09
 | listener | `0.0.0.0:443` | module grants `CAP_NET_BIND_SERVICE` for ports < 1024 |
 | TLS | `tls_letsencrypt_hostname` + HTTP-01 on port 80 | headscale's built-in ACME client; cert cached in `/var/lib/headscale/.cache`, renews itself. Current cert expires 2026-12-01 |
 | `dns.base_domain` | `ts.realo.ca` (`baseDomain` in the module) | MagicDNS suffix, tailnet-internal only, no public record. Must differ from and not be a parent of hs.realo.ca |
-| `dns.nameservers.global` | Quad9 secured: 9.9.9.9, 149.112.112.112, 2620:fe::fe, 2620:fe::9 with `override_local_dns` (since 2026-09-04; Cloudflare before) | clients use these while connected. Plain addresses: Tailscale knows them and upgrades to DoH (dns.quad9.net) on the client, no URL needed. Check with `tailscale dns status` on a node |
+| `dns.nameservers.global` | `100.64.0.5`, the Pi-hole on the kiosk Pi, with `override_local_dns` (since 2026-09-07; Quad9 direct 09-04 to 09-07, Cloudflare before) | Every node that accepts DNS resolves through the Pi-hole over the tailnet (ad/malware blocking), and the Pi-hole forwards through a local unbound to Quad9 over DNS-over-TLS. Queries never touch this server. If the Pi is down, those nodes have no DNS: swap the commented Quad9 line back in `headscale.nix` and deploy. Check with `tailscale dns status` on a node |
 | DERP | Tailscale's public relay map, auto-updated | no embedded DERP on 512 MB |
 | database | SQLite, `/var/lib/headscale/db.sqlite` | |
 | `unix_socket_permission` | `"0770"` | without it headscale chmods its CLI socket to 0700 and only root can use the CLI |
@@ -136,13 +138,15 @@ enables `services.headscale` (headscale 0.29.3 from nixos-unstable since 2026-09
 `realo` is in the `headscale` group, so the CLI works without sudo. Deploy
 is unchanged: `SERVER=root@104.238.132.193 VM_PASS=... ./build.sh deploy`.
 
-State on the server: one user `realo` (id 1) and three nodes, all under it:
+State on the server: one user `realo` (id 1) and five nodes, all under it:
 
 | Node | Device | Tailnet IP | Client config |
 |------|--------|------------|---------------|
 | `kerberos` | iPhone (iOS Tailscale app; reports hostname `localhost`, renamed) | 100.64.0.1 | iOS Settings app, see below |
 | `chaos` | the Mac | 100.64.0.2 | Tailscale for macOS, `tailscale login --login-server` |
 | `realix` | the dev VM | 100.64.0.3 | `services.tailscale` in realix-iso commit da5480a: `openFirewall = true`, `tailscale0` is a trusted firewall interface |
+| `reals-macbook-air` | MacBook Air | 100.64.0.4 | Tailscale for macOS |
+| `kiosk` | the Raspberry Pi 5 kiosk (also the Pi-hole, 192.168.2.10 on the LAN) | 100.64.0.5 | Debian bookworm, tailscale from the official apt repo, `tailscale up --login-server https://hs.realo.ca --hostname kiosk --accept-dns=false` (must not use itself as resolver). Registered with `headscale nodes register --user realo --key <authreq>` on 2026-09-07 |
 
 Verified: Mac -> `tailscale ping kerberos.ts.realo.ca` works; the VM is
 reachable from the phone and the Mac over the tailnet.
