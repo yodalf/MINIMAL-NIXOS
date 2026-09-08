@@ -1,7 +1,7 @@
 # Handoff: minimal NixOS server on Vultr, running headscale
 
-Date: 2026-09-07 (first written 2026-09-02). State at handoff: one server
-installed and deployed to, generation 14 (tailnet DNS = the kiosk Pi-hole, see below), NixOS 26.11pre from nixos-unstable;
+Date: 2026-09-08 (first written 2026-09-02). State at handoff: one server
+installed and deployed to, generation 15 (built by the nightly upgrade of 2026-09-08 on nixpkgs dc5d91f; generation 14 = tailnet DNS via the kiosk Pi-hole, see below), NixOS 26.11pre from nixos-unstable;
 it runs headscale 0.29.3 at https://hs.realo.ca with five nodes connected
 (branch `headscale`, see the section at the end). It upgrades itself nightly
 and collects garbage daily, and snapshots the headscale state daily (pull with `build.sh backup`).
@@ -60,6 +60,8 @@ Automatic upgrades and store maintenance (all in `server.nix`, first deployed 20
 
 It is a hand-written unit, not `system.autoUpgrade`: that module hardcodes `nixos-rebuild` (127 MB of Python). The first manual run (`systemctl start nixos-upgrade`) found nixpkgs unchanged but still rebooted, correctly: the box had been live-switched since the ISO install and had never booted the headscale generation's initrd. Check on it with `journalctl -u nixos-upgrade` and `systemctl list-timers`. The server's `/etc/nixos/flake.lock` moves ahead of the repo's every night, hence the `scp` above before deploying.
 
+Last verified unattended run, 2026-09-08 05:01 UTC (the first success after the journald breakage, see Gotchas): nixpkgs c043004 -> dc5d91f, 2 min 42 s wall, 232 MB resident + 555 MB swap peak, "kernel, modules or initrd changed" so it rebooted itself at 05:05 into generation 15; headscale was back at 05:05:45, `nix-gc` ran via `OnSuccess`, and the 03:00 `headscale-backup` had run before it. After that run the server's lock (dc5d91f) is one day ahead of the branch's (c043004): scp it before the next deploy.
+
 Rebuild the ISO (only needed for installing new machines; ~15 min under emulation):
 
 ```sh
@@ -97,7 +99,7 @@ Rescue: attach the ISO to the instance again and boot it. It auto-logs in as roo
 - Evaluating this config needs ~750 MB (measured 2026-09-03 with `systemd-run --wait`: 230 MB resident, 550 MB swap peak). On zram alone it cannot fit; with the 2 GB `/swapfile` (`swapDevices` in server.nix, created by NixOS at boot, priority below zram) `rebuild` takes 2 min 16 s cold including the nixpkgs download, ~40 s warm, ~16 s with a warm eval cache. Headscale is not disturbed.
 - `/etc/nixos` on the server was found stale on 2026-09-03: it still had the placeholder headscale module (loopback :8080) while the running system was the TLS one; the last two deploys of 2026-09-02 had not refreshed it. A local `rebuild` from it would have dropped port 443. The deploy refresh is now a plain tar copy instead of a `nix build` of `packages.src`. If in doubt: `diff -r` the repo against `/etc/nixos` before running `rebuild` on the box.
 - Found stale again on 2026-09-07, and this time the cause: inside the `build.sh deploy` heredoc, the ssh that `nixos-rebuild --target-host` opens reads the rest of the script from stdin, so the tar step after it never ran. Fixed with `</dev/null` on the `nixos-rebuild` line. This matters because the nightly upgrade builds from `/etc/nixos`: a stale copy there silently reverts whatever the last deploy changed.
-- nixpkgs removed `services.journald.extraConfig` between 2026-09-04 and 09-05 (assertion: use `services.journald.settings.Journal`). The nightly upgrade failed on 09-05, 09-06 and 09-07 until `server.nix` was changed; nothing warns about this except `journalctl -u nixos-upgrade`.
+- nixpkgs removed `services.journald.extraConfig` between 2026-09-04 and 09-05 (assertion: use `services.journald.settings.Journal`). The nightly upgrade failed on 09-05, 09-06 and 09-07 until `server.nix` was changed (deployed as generation 14); the 09-08 run then succeeded, see Day-to-day. Nothing warns about this except `journalctl -u nixos-upgrade`. The realo-ca box had the same failure (09-06 to 09-08) and got the same two fixes on 2026-09-08.
 - The `rebuild` script originally had only nix on its PATH and failed under systemd (`id: command not found`); it now includes coreutils and calls `/run/wrappers/bin/sudo`.
 - Anything in the repo directory on the dev VM ends up inside the ISO if it is in the `src` file set; a disk image once added 800 MB to the ISO. `build.sh` now excludes `*.log`/`*.qcow2` and the file set is explicit, but keep junk out of `/home/realo/Data/Work/MINIMAL-SERVER`.
 - `nixos-rebuild build` in that directory overwrites the `result` symlink that `build.sh iso` also uses. Re-run `nix build .#packages.x86_64-linux.iso --out-link result` (instant when cached) to restore it.
