@@ -1,12 +1,14 @@
 # Handoff: realo.ca web server on Vultr (branch `realo-ca`)
 
-Date: 2026-09-03 evening (branch created earlier the same day from `main`;
-the generic handoff was first written 2026-09-02). State at handoff: one
-server `realo-ca` installed from the v0.2 ISO and running generation 1,
-NixOS 26.11pre from nixos-unstable, serving https://realo.ca with a Let's
-Encrypt certificate and the Hugo site migrated from the old 2017 instance.
-It upgrades itself nightly and collects garbage daily; both were exercised by
-hand today. The old instance is stopped and fully backed up.
+Date: 2026-09-08 (branch created 2026-09-03 from `main`; the generic
+handoff was first written 2026-09-02). State at handoff: one server
+`realo-ca` installed from the v0.2 ISO and running generation 2 (nixpkgs
+dc5d91f, 2026-09-07), NixOS 26.11pre from nixos-unstable, serving
+https://realo.ca with a Let's Encrypt certificate and the Hugo site migrated
+from the old 2017 instance. It upgrades itself nightly and collects garbage
+daily. The nightly upgrade had failed on Sep 6, 7 and 8 (journald option
+removed from nixpkgs); fixed and re-verified 2026-09-08, see "Self-maintenance"
+and the gotchas. The old instance is stopped and fully backed up.
 
 This branch is a permanent role branch like `headscale`: never merged into
 `main` (the generic server); rebase or cherry-pick generic fixes from `main`
@@ -194,6 +196,19 @@ re-activated the same generation without a reboot, then `nix-gc` ran via
 `OnSuccess` (4498 paths, 202 MiB freed, disk 3.9 -> 3.3 GB). nginx stayed
 up throughout.
 
+Then it broke: nixpkgs dropped `services.journald.extraConfig` and the runs
+of Sep 6, 7 and 8 (04:50 UTC) all failed the assertion "no longer has any
+effect" while evaluating `/etc/nixos`, so the box stayed on generation 1
+with the lock file moving ahead every night (the `nix flake update` step
+runs before the eval). Fixed 2026-09-08 by taking the same two fixes as the
+headscale branch (`services.journald.settings.Journal.SystemMaxUse` and the
+`build.sh` stdin fix below), deploying with the server's lock (dc5d91f)
+from the dev VM (generation 2, live switch), then `systemctl start
+nixos-upgrade` by hand: success in 2 min 15 s, 183 MB resident + 557 MB
+swap peak, nixpkgs unchanged; "kernel, modules or initrd changed" because
+the box was still booted on generation 1's kernel, so it rebooted itself one
+minute later and `nix-gc` ran via `OnSuccess`.
+
 Content: the Hugo site (title "Réal Ouellet", theme "academic", 31 pages,
 3 MB built) from the old instance, where it ran as `hugo server` in a
 `klakegg/hugo:ext-pandoc` container behind Traefik.
@@ -232,9 +247,18 @@ unique.
   headscale; 262 + 533 here). On zram alone it cannot fit; the 2 GB
   `/swapfile` (`swapDevices` in server.nix, created by NixOS at boot,
   priority below zram) makes it work.
-- `/etc/nixos` on a server was once found stale (headscale box, 2026-09-03):
-  the deploy refresh is now a plain tar copy. If in doubt, `diff -r` the repo
-  against `/etc/nixos` before running `rebuild` on the box.
+- `/etc/nixos` on a server kept going stale after deploys (both boxes). Root
+  cause found 2026-09-07 on headscale: the ssh that `nixos-rebuild
+  --target-host` opens read the rest of the deploy heredoc in `build.sh` from
+  stdin, so the tar step that refreshes `/etc/nixos` never ran. `build.sh`
+  now runs `nixos-rebuild ... </dev/null`; verified here 2026-09-08 (repo and
+  `/etc/nixos` identical after the deploy). This mattered because the nightly
+  upgrade evaluates `/etc/nixos`, not the repo. If in doubt, `diff -r` the
+  repo against `/etc/nixos` before running `rebuild` on the box.
+- Generic fixes land on `headscale` first as often as on `main`; when
+  bringing one over, `git checkout headscale -- build.sh modules/server.nix`
+  is safer than a cherry-pick of the whole commit, which also carries
+  headscale.nix, its handoff and its lock file.
 - Anything in the repo directory on the dev VM ends up inside the ISO if it
   is in the `src` file set; keep junk out of
   `/home/realo/Data/Work/MINIMAL-SERVER`. `build.sh` excludes

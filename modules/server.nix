@@ -175,9 +175,7 @@ in
   i18n.supportedLocales = [ "en_US.UTF-8/UTF-8" ];
   time.timeZone = "UTC";
 
-  services.journald.extraConfig = ''
-    SystemMaxUse=200M
-  '';
+  services.journald.settings.Journal.SystemMaxUse = "200M";
 
   ### Nix ####################################################################
 

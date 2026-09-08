@@ -73,7 +73,9 @@ case "${1:-iso}" in
 set -euo pipefail
 cd $VM_DIR
 export NIX_SSHOPTS="-o StrictHostKeyChecking=accept-new"
-nixos-rebuild $action --flake .#server --target-host $SERVER
+# </dev/null: without it the ssh inside nixos-rebuild reads the rest of this
+# script from stdin and the sync step below never runs.
+nixos-rebuild $action --flake .#server --target-host $SERVER </dev/null
 # Keep /etc/nixos on the server in sync with what was deployed: the same
 # files as packages.src, copied straight from the working tree (the nix
 # output was found stale once, so no nix in this step).
