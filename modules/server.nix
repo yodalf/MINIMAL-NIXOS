@@ -90,7 +90,6 @@ in
   # Vultr web (VNC) console shows.
   boot.kernelParams = [ "console=tty0" "console=ttyS0,115200n8" ];
   boot.consoleLogLevel = 7;
-  boot.initrd.verbose = true;
   boot.tmp.cleanOnBoot = true;
 
   fileSystems."/" = {
